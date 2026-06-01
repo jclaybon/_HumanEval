@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Vibe Check</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --text: #1A1814;
+    --muted: #8C8880;
+    --border: rgba(26,24,20,0.1);
+    --accent: #1A1814;
+    --good: #2D6A4F;
+    --bad: #C1440E;
+    --thumb: #1A1814;
+    --track: rgba(26,24,20,0.15);
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── SETUP SCREEN ── */
+  #setup-screen {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    gap: 2rem;
+  }
+
+  .logo-mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-mark svg { width: 28px; height: 28px; }
+
+  .setup-headline {
+    text-align: center;
+  }
+
+  .setup-headline h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.2rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .setup-headline p {
+    margin-top: 0.6rem;
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-weight: 300;
+    line-height: 1.6;
+  }
+
+  .upload-zone {
+    width: 100%;
+    border: 1.5px dashed rgba(26,24,20,0.25);
+    border-radius: 20px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: transparent;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--text);
+    background: rgba(26,24,20,0.03);
+  }
+
+  .upload-zone input { display: none; }
+
+  .upload-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(26,24,20,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+  }
+
+  .upload-zone h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+  }
+
+  .upload-zone p {
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  #file-count {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 400;
+    min-height: 1.2em;
+    text-align: center;
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 1rem;
+    background: var(--text);
+    color: #F7F5F0;
+    border: none;
+    border-radius: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .btn-primary:not(:disabled):active { transform: scale(0.98); }
+
+  /* ── EVAL SCREEN ── */
+  #eval-screen {
+    display: none;
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    flex-direction: column;
+  }
+
+  .eval-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.4rem 1.5rem 1rem;
+  }
+
+  .eval-header-left {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .eval-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.35rem;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+
+  .eval-subtitle {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-weight: 300;
+    margin-top: 2px;
+  }
+
+  .progress-pill {
+    background: rgba(26,24,20,0.06);
+    border-radius: 20px;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .progress-bar-wrap {
+    padding: 0 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .progress-bar-bg {
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--text);
+    border-radius: 2px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .image-wrap {
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .image-card {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 20px;
+    overflow: hidden;
+    background: rgba(26,24,20,0.04);
+    position: relative;
+  }
+
+  .image-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .image-name-badge {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(247,245,240,0.88);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text);
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scores-area {
+    padding: 0 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .score-block label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.9rem;
+  }
+
+  /* Prompt faithfulness 1-5 */
+  .faith-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .faith-btn {
+    flex: 1;
+    aspect-ratio: 1;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.25rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .faith-btn:hover {
+    border-color: rgba(26,24,20,0.4);
+    color: var(--text);
+  }
+
+  .faith-btn.selected {
+    background: var(--text);
+    border-color: var(--text);
+    color: #F7F5F0;
+  }
+
+  .faith-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+
+  .faith-labels span {
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  /* Quality slider */
+  .quality-slider-wrap {
+    position: relative;
+  }
+
+  .quality-track {
+    position: relative;
+    height: 48px;
+    display: flex;
+    align-items: center;
+  }
+
+  input[type="range"].quality-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(to right, #C1440E, #e8e4dc, #2D6A4F);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"].quality-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--text);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    transition: transform 0.1s;
+  }
+
+  input[type="range"].quality-range:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+  }
+
+  .quality-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: -2px;
+  }
+
+  .quality-labels span {
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .quality-value {
+    text-align: center;
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.1rem;
+    color: var(--text);
+    margin-top: 4px;
+    min-height: 1.4em;
+    transition: color 0.2s;
+  }
+
+  /* Vibe check YES/NO */
+  .vibe-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .vibe-btn {
+    padding: 1rem;
+    border-radius: 16px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+
+  .vibe-btn .vibe-emoji {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .vibe-btn .vibe-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .vibe-btn:hover { border-color: rgba(26,24,20,0.35); }
+
+  .vibe-btn.pass {
+    background: rgba(45,106,79,0.07);
+    border-color: #2D6A4F;
+  }
+
+  .vibe-btn.pass .vibe-label { color: #2D6A4F; }
+
+  .vibe-btn.fail {
+    background: rgba(193,68,14,0.07);
+    border-color: #C1440E;
+  }
+
+  .vibe-btn.fail .vibe-label { color: #C1440E; }
+
+  /* Notes */
+  .notes-area {
+    padding: 0 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .notes-area label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .notes-area textarea {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--text);
+    background: var(--surface);
+    resize: none;
+    outline: none;
+    transition: border-color 0.15s;
+    line-height: 1.5;
+  }
+
+  .notes-area textarea:focus { border-color: rgba(26,24,20,0.5); }
+  .notes-area textarea::placeholder { color: var(--muted); }
+
+  .submit-area {
+    padding: 1.5rem;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 1.05rem;
+    background: var(--text);
+    color: #F7F5F0;
+    border: none;
+    border-radius: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+
+  .submit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .submit-btn:not(:disabled):active { transform: scale(0.98); }
+
+  .skip-btn {
+    width: 100%;
+    padding: 0.6rem;
+    background: none;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  /* ── DONE SCREEN ── */
+  #done-screen {
+    display: none;
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 2rem;
+    gap: 2rem;
+    text-align: center;
+  }
+
+  .done-mark {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(45,106,79,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+  }
+
+  #done-screen h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    letter-spacing: -0.02em;
+  }
+
+  #done-screen p {
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-weight: 300;
+    line-height: 1.6;
+  }
+
+  .stats-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 1rem;
+    border: 1px solid var(--border);
+  }
+
+  .stat-card .stat-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    line-height: 1;
+    color: var(--text);
+  }
+
+  .stat-card .stat-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 400;
+  }
+
+  .stat-card.pass-card .stat-num { color: #2D6A4F; }
+  .stat-card.fail-card .stat-num { color: #C1440E; }
+
+  .download-btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--text);
+    color: #F7F5F0;
+    border: none;
+    border-radius: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s;
+  }
+
+  .restart-btn {
+    background: none;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0.5rem;
+  }
+
+  /* util */
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup-screen">
+  <div class="logo-mark">
+    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="14" r="5" fill="#F7F5F0"/>
+      <circle cx="14" cy="5" r="2.5" fill="#F7F5F0" opacity="0.5"/>
+      <circle cx="14" cy="23" r="2.5" fill="#F7F5F0" opacity="0.5"/>
+      <circle cx="5" cy="14" r="2.5" fill="#F7F5F0" opacity="0.5"/>
+      <circle cx="23" cy="14" r="2.5" fill="#F7F5F0" opacity="0.5"/>
+    </svg>
+  </div>
+
+  <div class="setup-headline">
+    <h1>Vibe Check</h1>
+    <p>Human eval for image generation quality.<br>Load a folder, start rating.</p>
+  </div>
+
+  <div class="upload-zone" id="drop-zone">
+    <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" multiple>
+    <div class="upload-icon">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <path d="M10 2v12M10 2L6 6M10 2l4 4M3 15h14" stroke="#1A1814" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h3>Drop images here</h3>
+    <p>PNG, JPG, or WebP · any quantity</p>
+  </div>
+
+  <p id="file-count"></p>
+
+  <button class="btn-primary" id="start-btn" disabled>Start eval →</button>
+</div>
+
+<!-- ══ EVAL ══ -->
+<div id="eval-screen">
+  <div class="eval-header">
+    <div class="eval-header-left">
+      <span class="eval-title">Vibe Check</span>
+      <span class="eval-subtitle" id="eval-filename">image.png</span>
+    </div>
+    <div class="progress-pill" id="progress-pill">1 / 1</div>
+  </div>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="image-wrap">
+    <div class="image-card">
+      <img id="eval-img" src="" alt="Image to evaluate">
+      <div class="image-name-badge" id="img-badge">image.png</div>
+    </div>
+  </div>
+
+  <div class="scores-area">
+
+    <div class="score-block">
+      <label>Prompt faithfulness</label>
+      <div class="faith-row" id="faith-row">
+        <button class="faith-btn" data-val="1">1</button>
+        <button class="faith-btn" data-val="2">2</button>
+        <button class="faith-btn" data-val="3">3</button>
+        <button class="faith-btn" data-val="4">4</button>
+        <button class="faith-btn" data-val="5">5</button>
+      </div>
+      <div class="faith-labels">
+        <span>off-prompt</span>
+        <span>spot on</span>
+      </div>
+    </div>
+
+    <div class="score-block">
+      <label>Overall quality</label>
+      <div class="quality-track">
+        <input type="range" class="quality-range" id="quality-range" min="1" max="10" value="5" step="1">
+      </div>
+      <div class="quality-labels">
+        <span>bad</span>
+        <span>good</span>
+      </div>
+      <div class="quality-value" id="quality-label">—</div>
+    </div>
+
+    <div class="score-block">
+      <label>Does this pass the vibe check?</label>
+      <div class="vibe-row">
+        <button class="vibe-btn" id="vibe-pass" data-val="pass">
+          <span class="vibe-emoji">✓</span>
+          <span class="vibe-label">Pass</span>
+        </button>
+        <button class="vibe-btn" id="vibe-fail" data-val="fail">
+          <span class="vibe-emoji">✕</span>
+          <span class="vibe-label">Fail</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notes-area">
+    <label>Notes (optional)</label>
+    <textarea id="notes-input" rows="2" placeholder="Any observations..."></textarea>
+  </div>
+
+  <div class="submit-area">
+    <button class="submit-btn" id="submit-btn" disabled>Next image →</button>
+    <button class="skip-btn" id="skip-btn">Skip this one</button>
+  </div>
+</div>
+
+<!-- ══ DONE ══ -->
+<div id="done-screen">
+  <div class="done-mark">✓</div>
+  <div>
+    <h2>Eval complete.</h2>
+    <p>Here's how the batch did.</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-total">0</div>
+      <div class="stat-label">images reviewed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-avg-faith">—</div>
+      <div class="stat-label">avg faithfulness</div>
+    </div>
+    <div class="stat-card pass-card">
+      <div class="stat-num" id="stat-pass">0</div>
+      <div class="stat-label">passed vibe check</div>
+    </div>
+    <div class="stat-card fail-card">
+      <div class="stat-num" id="stat-fail">0</div>
+      <div class="stat-label">flagged</div>
+    </div>
+  </div>
+
+  <button class="download-btn" id="download-btn">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M9 2v10M9 12L5 8M9 12l4-4M2 15h14" stroke="#F7F5F0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Download results CSV
+  </button>
+  <button class="restart-btn" id="restart-btn">Start a new batch</button>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// State
+let files = [], current = 0, results = [];
+let faithScore = null, vibeScore = null;
+
+// ── File loading ──
+const dropZone = $('drop-zone');
+const fileInput = $('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => loadFiles(Array.from(e.target.files)));
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  loadFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
+});
+
+function loadFiles(arr) {
+  files = arr.filter(f => f.type.startsWith('image/'));
+  const n = files.length;
+  $('file-count').textContent = n === 0 ? '' : `${n} image${n > 1 ? 's' : ''} ready`;
+  $('start-btn').disabled = n === 0;
+}
+
+$('start-btn').addEventListener('click', () => {
+  current = 0;
+  results = [];
+  showEval();
+});
+
+// ── Eval screen ──
+function showEval() {
+  $('setup-screen').style.display = 'none';
+  $('done-screen').style.display = 'none';
+  $('eval-screen').style.display = 'flex';
+  loadImage(current);
+}
+
+function loadImage(idx) {
+  const file = files[idx];
+  const url = URL.createObjectURL(file);
+  $('eval-img').src = url;
+  $('eval-filename').textContent = file.name;
+  $('img-badge').textContent = file.name;
+  $('progress-pill').textContent = `${idx + 1} / ${files.length}`;
+  $('progress-fill').style.width = `${(idx / files.length) * 100}%`;
+  $('notes-input').value = '';
+  $('quality-range').value = 5;
+  $('quality-label').textContent = '—';
+
+  // reset faith
+  faithScore = null;
+  document.querySelectorAll('.faith-btn').forEach(b => b.classList.remove('selected'));
+
+  // reset vibe
+  vibeScore = null;
+  $('vibe-pass').className = 'vibe-btn';
+  $('vibe-fail').className = 'vibe-btn';
+
+  updateSubmit();
+}
+
+// Faith buttons
+document.querySelectorAll('.faith-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    faithScore = parseInt(btn.dataset.val);
+    document.querySelectorAll('.faith-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    updateSubmit();
+  });
+});
+
+// Quality slider
+const qualityRange = $('quality-range');
+const qualityLabel = $('quality-label');
+const labels = ['', 'Poor', 'Poor', 'Below avg', 'Below avg', 'Average', 'Average', 'Good', 'Good', 'Great', 'Excellent'];
+qualityRange.addEventListener('input', () => {
+  qualityLabel.textContent = labels[qualityRange.value] || '—';
+});
+
+// Vibe buttons
+[$('vibe-pass'), $('vibe-fail')].forEach(btn => {
+  btn.addEventListener('click', () => {
+    vibeScore = btn.dataset.val;
+    $('vibe-pass').className = 'vibe-btn';
+    $('vibe-fail').className = 'vibe-btn';
+    btn.classList.add(btn.dataset.val);
+    updateSubmit();
+  });
+});
+
+function updateSubmit() {
+  $('submit-btn').disabled = !(faithScore && vibeScore);
+}
+
+$('submit-btn').addEventListener('click', () => submitAndNext(false));
+$('skip-btn').addEventListener('click', () => submitAndNext(true));
+
+function submitAndNext(skipped) {
+  if (!skipped) {
+    results.push({
+      filename: files[current].name,
+      faithfulness: faithScore,
+      quality: parseInt(qualityRange.value),
+      vibe: vibeScore,
+      notes: $('notes-input').value.trim(),
+      skipped: false
+    });
+  } else {
+    results.push({ filename: files[current].name, skipped: true });
+  }
+
+  current++;
+  if (current >= files.length) {
+    showDone();
+  } else {
+    loadImage(current);
+  }
+}
+
+// ── Done screen ──
+function showDone() {
+  $('eval-screen').style.display = 'none';
+  $('done-screen').style.display = 'flex';
+
+  const rated = results.filter(r => !r.skipped);
+  const passed = rated.filter(r => r.vibe === 'pass').length;
+  const failed = rated.filter(r => r.vibe === 'fail').length;
+  const avgFaith = rated.length ? (rated.reduce((s, r) => s + r.faithfulness, 0) / rated.length).toFixed(1) : '—';
+
+  $('stat-total').textContent = rated.length;
+  $('stat-avg-faith').textContent = avgFaith;
+  $('stat-pass').textContent = passed;
+  $('stat-fail').textContent = failed;
+}
+
+$('download-btn').addEventListener('click', () => {
+  const rows = [['filename','faithfulness','quality','vibe','notes','skipped']];
+  results.forEach(r => {
+    rows.push([
+      r.filename,
+      r.skipped ? '' : r.faithfulness,
+      r.skipped ? '' : r.quality,
+      r.skipped ? '' : r.vibe,
+      r.skipped ? '' : (r.notes || ''),
+      r.skipped ? 'true' : 'false'
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vibe-check-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+});
+
+$('restart-btn').addEventListener('click', () => {
+  files = []; results = []; current = 0;
+  fileInput.value = '';
+  $('file-count').textContent = '';
+  $('start-btn').disabled = true;
+  $('done-screen').style.display = 'none';
+  $('setup-screen').style.display = 'flex';
+});
+</script>
+</body>
+</html>
