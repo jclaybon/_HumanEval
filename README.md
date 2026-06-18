@@ -1,6 +1,4 @@
-# Human Eval App
-
-This project now has a React frontend, a lightweight Python backend, and a cleaner split between app code and runtime data.
+# Underscore Human Eval App
 
 ## Structure
 
