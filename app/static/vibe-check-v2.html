@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Invited to the cookout? 🍗</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F5F0;--surface:#FFFFFF;--text:#1A1814;--muted:#8C8880;
+  --border:rgba(26,24,20,0.1);--border-mid:rgba(26,24,20,0.22);
+  --good:#2D6A4F;--bad:#C1440E;--dark:#1A1814;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center}
+.screen{width:100%;max-width:480px;min-height:100vh;display:none;flex-direction:column}
+.screen.active{display:flex}
+#loading-screen,#empty-screen,#done-screen{align-items:center;justify-content:center;padding:3rem 2rem;gap:1.4rem;text-align:center}
+.logo-mark{width:54px;height:54px;border-radius:16px;background:var(--text);display:flex;align-items:center;justify-content:center;color:#F7F5F0;font-family:'DM Serif Display',serif;font-size:1.2rem}
+.headline h1{font-family:'DM Serif Display',serif;font-size:2.25rem;line-height:1.05;letter-spacing:-.03em}
+.headline p{margin-top:.55rem;font-size:.92rem;color:var(--muted);font-weight:300;line-height:1.6}
+.info-card{width:100%;background:var(--surface);border-radius:20px;border:1px solid var(--border);padding:1.1rem 1.15rem;text-align:left}
+.info-card h2{font-size:.74rem;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem}
+.info-card p,.info-card code{font-size:.92rem;line-height:1.55;color:var(--text)}
+.info-card code{display:block;padding:.8rem .9rem;border-radius:12px;background:rgba(26,24,20,.04);overflow-wrap:anywhere}
+
+.eval-header{display:flex;align-items:center;justify-content:space-between;padding:1.35rem 1.5rem 1rem}
+.eval-head-left{display:flex;flex-direction:column}
+.eval-title{font-family:'DM Serif Display',serif;font-size:1.38rem;letter-spacing:-.02em;line-height:1.15}
+.pill{background:rgba(26,24,20,.06);border-radius:20px;padding:.28rem .72rem;font-size:.78rem;font-weight:500;color:var(--muted);white-space:nowrap}
+
+.image-wrap{padding:0 1.5rem;margin-bottom:1.2rem}
+.image-card{width:100%;aspect-ratio:1;border-radius:22px;overflow:hidden;background:rgba(26,24,20,.04);position:relative;display:flex;align-items:center;justify-content:center;padding:1rem}
+.image-stage{position:relative;display:inline-flex;align-items:center;justify-content:center;max-width:100%;max-height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+.image-card img{max-width:100%;max-height:100%;object-fit:contain;display:block;border-radius:16px}
+.skeleton{width:100%;height:100%;background:linear-gradient(90deg,rgba(26,24,20,.04) 0%,rgba(26,24,20,.09) 50%,rgba(26,24,20,.04) 100%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.mask-canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:none;touch-action:none}
+.mask-canvas.active{display:block;cursor:crosshair}
+.swipe-overlay{position:absolute;inset:0;pointer-events:none}
+.swipe-badge{position:absolute;padding:.45rem .82rem;border:2px solid currentColor;border-radius:999px;background:rgba(247,245,240,.9);font-size:.8rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:0;transform:scale(.88);transition:opacity .15s,transform .15s}
+.swipe-badge.visible{opacity:1;transform:scale(1)}
+.swipe-badge.nope{top:18px;left:18px;color:var(--bad)}
+.swipe-badge.like{top:18px;right:18px;color:var(--good)}
+.swipe-badge.super{top:18px;left:50%;transform:translateX(-50%) scale(.88);color:var(--dark)}
+.swipe-badge.super.visible{transform:translateX(-50%) scale(1)}
+.swipe-hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);padding:.45rem .78rem;border-radius:999px;background:rgba(26,24,20,.72);color:#F7F5F0;font-size:.72rem;font-weight:500;letter-spacing:.03em;white-space:nowrap}
+
+.swipe-panel{padding:0 1.5rem 1rem;display:flex;flex-direction:column;gap:1rem}
+.secondary-actions{display:none;grid-template-columns:1fr 1fr 1fr;gap:.75rem}
+.secondary-actions.active{display:grid}
+.swipe-btn{padding:.96rem .8rem;border-radius:18px;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:500;cursor:pointer;transition:transform .15s,opacity .15s;border:1px solid transparent;background:var(--surface)}
+.swipe-btn:active{transform:scale(.98)}
+.swipe-btn.mark{border:1px solid var(--border-mid);color:var(--text)}
+.swipe-btn.mark.active{background:var(--dark);color:#F7F5F0;border-color:var(--dark)}
+.swipe-btn.next{background:var(--dark);border-color:var(--dark);color:#F7F5F0}
+.swipe-btn.back{border:1px solid var(--border-mid);background:var(--surface);color:var(--text)}
+.swipe-btn:disabled{opacity:.35;cursor:not-allowed}
+
+.notes-area{display:none;padding:0 1.5rem;margin-top:1rem}
+.notes-area.active{display:block}
+.notes-area label{display:block;font-size:.72rem;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem}
+.notes-area textarea{width:100%;border:1px solid var(--border-mid);border-radius:12px;padding:.75rem .9rem;font-family:'DM Sans',sans-serif;font-size:.88rem;color:var(--text);background:var(--surface);resize:none;outline:none;transition:border-color .15s;line-height:1.5}
+.notes-area textarea:focus{border-color:var(--text)}
+.notes-area textarea::placeholder{color:var(--muted)}
+.notes-area textarea:disabled{opacity:.45;cursor:not-allowed}
+
+.submit-area{padding:1.3rem 1.5rem;padding-bottom:max(1.3rem,env(safe-area-inset-bottom))}
+.skip-btn{width:100%;padding:.6rem;background:none;border:none;font-family:'DM Sans',sans-serif;font-size:.82rem;color:var(--muted);cursor:pointer}
+
+.done-mark{width:68px;height:68px;border-radius:50%;background:rgba(45,106,79,.1);display:flex;align-items:center;justify-content:center;font-size:1.9rem}
+#done-screen h2{font-family:'DM Serif Display',serif;font-size:1.9rem;letter-spacing:-.02em}
+#done-screen p{font-size:.9rem;color:var(--muted);font-weight:300;line-height:1.6}
+.stats-grid{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat-card{background:var(--surface);border-radius:16px;padding:1rem;border:1px solid var(--border)}
+.stat-card .sn{font-family:'DM Serif Display',serif;font-size:1.9rem;line-height:1;color:var(--text)}
+.stat-card .sl{font-size:.72rem;color:var(--muted);margin-top:3px}
+.stat-card.good-card .sn{color:var(--good)}
+.stat-card.alert-card .sn{color:var(--bad)}
+
+@media (max-width:420px){
+  .secondary-actions,.stats-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="screen active" id="loading-screen">
+  <div class="logo-mark">🍗</div>
+  <div class="headline">
+    <h1>Loading images</h1>
+    <p>Looking for files in the configured review source.</p>
+  </div>
+</div>
+
+<div class="screen" id="empty-screen">
+  <div class="logo-mark">🍗</div>
+  <div class="headline">
+    <h1>No images found</h1>
+    <p>Add images to the configured review source, then refresh this page.</p>
+  </div>
+  <div class="info-card">
+    <h2>Review source</h2>
+    <code id="empty-folder-path">—</code>
+  </div>
+  <div class="info-card">
+    <h2>Supported files</h2>
+    <p>PNG, JPG, JPEG, WEBP, and GIF.</p>
+  </div>
+</div>
+
+<div class="screen" id="eval-screen">
+  <div class="eval-header">
+    <div class="eval-head-left">
+      <span class="eval-title">Invited to the cookout? 🍗</span>
+    </div>
+    <div class="pill" id="progress-pill">1 / 1</div>
+  </div>
+
+  <div class="image-wrap">
+    <div class="image-card">
+      <div class="skeleton" id="img-skeleton"></div>
+      <div class="image-stage" id="image-stage" style="display:none">
+        <img id="eval-img" src="" alt="">
+        <canvas id="mask-canvas" class="mask-canvas"></canvas>
+        <div class="swipe-overlay">
+          <div class="swipe-badge nope" id="swipe-nope">Nope</div>
+          <div class="swipe-badge like" id="swipe-like">Like</div>
+          <div class="swipe-badge super" id="swipe-super">Super</div>
+          <div class="swipe-hint" id="swipe-hint">Left no, right like, up super like</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="swipe-panel">
+    <div class="secondary-actions" id="followup-actions">
+      <button class="swipe-btn back" id="back-btn" type="button">Back</button>
+      <button class="swipe-btn next" id="next-btn" type="button">Next image</button>
+      <button class="swipe-btn mark" id="clear-mark-btn" type="button">Clear marks</button>
+    </div>
+  </div>
+
+  <div class="notes-area">
+    <label>Why is this an issue?</label>
+    <textarea id="notes-input" rows="3" placeholder=""></textarea>
+  </div>
+
+  <div class="submit-area">
+    <button class="skip-btn" id="skip-btn" type="button">Skip this image</button>
+  </div>
+</div>
+
+<div class="screen" id="done-screen">
+  <div class="done-mark">✓</div>
+  <div>
+    <h2>Batch complete.</h2>
+    <p id="done-copy">Results were saved locally.</p>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="sn" id="s-total">0</div><div class="sl">reviewed</div></div>
+    <div class="stat-card good-card"><div class="sn" id="s-like">0</div><div class="sl">likes</div></div>
+    <div class="stat-card good-card"><div class="sn" id="s-super">0</div><div class="sl">super likes</div></div>
+    <div class="stat-card alert-card"><div class="sn" id="s-nope">0</div><div class="sl">not likes</div></div>
+    <div class="stat-card alert-card"><div class="sn" id="s-mask">0</div><div class="sl">marked issues</div></div>
+  </div>
+  <div class="info-card">
+    <h2>Saved to</h2>
+    <code id="saved-path">—</code>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const show = id => {
+  document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+  $(id).classList.add('active');
+};
+
+let images = [];
+let current = 0;
+let results = [];
+let batchLabel = '';
+let reviewFolder = '';
+let outputPath = '';
+
+const reviewState = { verdict: null, mask: 'clear' };
+let maskPaths = [];
+let activePath = null;
+let isDrawing = false;
+let swipeGesture = null;
+let swipeDelta = { x: 0, y: 0 };
+
+const imageStage = $('image-stage');
+const maskCanvas = $('mask-canvas');
+const maskCtx = maskCanvas.getContext('2d');
+
+function clearSwipeBadges() {
+  $('swipe-nope').classList.remove('visible');
+  $('swipe-like').classList.remove('visible');
+  $('swipe-super').classList.remove('visible');
+}
+
+function updateSwipeBadges(decision) {
+  clearSwipeBadges();
+  if (decision === 'not_like') $('swipe-nope').classList.add('visible');
+  if (decision === 'like') $('swipe-like').classList.add('visible');
+  if (decision === 'super_like') $('swipe-super').classList.add('visible');
+}
+
+function resetReviewState() {
+  reviewState.verdict = null;
+  reviewState.mask = 'clear';
+}
+
+function resetSwipeCard(immediate = false) {
+  swipeGesture = null;
+  swipeDelta = { x: 0, y: 0 };
+  imageStage.style.transition = immediate ? 'none' : 'transform .2s ease, opacity .2s ease';
+  imageStage.style.transform = 'translate3d(0,0,0) rotate(0deg)';
+  imageStage.style.opacity = '1';
+  clearSwipeBadges();
+  $('swipe-hint').textContent = reviewState.mask === 'mark' ? 'Markup mode on' : 'Left no, right like, up super like';
+
+  if (immediate) {
+    requestAnimationFrame(() => {
+      imageStage.style.transition = '';
+    });
+  }
+}
+
+function resizeMaskCanvas() {
+  const img = $('eval-img');
+  if (!img.clientWidth || !img.clientHeight) return;
+  maskCanvas.width = img.clientWidth;
+  maskCanvas.height = img.clientHeight;
+  maskCanvas.style.width = `${img.clientWidth}px`;
+  maskCanvas.style.height = `${img.clientHeight}px`;
+  redrawMaskCanvas();
+}
+
+function redrawMaskCanvas() {
+  maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+  maskCtx.lineWidth = 6;
+  maskCtx.lineCap = 'round';
+  maskCtx.lineJoin = 'round';
+  maskCtx.strokeStyle = 'rgba(193,68,14,0.95)';
+
+  maskPaths.forEach(path => {
+    if (!path.length) return;
+    maskCtx.beginPath();
+    maskCtx.moveTo(path[0].x, path[0].y);
+    path.slice(1).forEach(point => maskCtx.lineTo(point.x, point.y));
+    maskCtx.stroke();
+  });
+
+  if (activePath && activePath.length) {
+    maskCtx.beginPath();
+    maskCtx.moveTo(activePath[0].x, activePath[0].y);
+    activePath.slice(1).forEach(point => maskCtx.lineTo(point.x, point.y));
+    maskCtx.stroke();
+  }
+}
+
+function updateMaskUi() {
+  const marking = reviewState.mask === 'mark';
+  const hasNotes = $('notes-input').value.trim().length > 0;
+  const hasMarks = maskPaths.length > 0;
+  $('followup-actions').classList.toggle('active', marking);
+  document.querySelector('.notes-area').classList.toggle('active', marking);
+  maskCanvas.classList.toggle('active', marking);
+  $('notes-input').disabled = !marking;
+  $('notes-input').required = marking;
+  $('next-btn').disabled = !marking || !hasMarks || !hasNotes;
+  $('back-btn').disabled = !marking;
+  $('clear-mark-btn').disabled = !hasMarks;
+  $('skip-btn').disabled = marking;
+  $('swipe-hint').textContent = marking
+    ? 'Circle failure points, add a note, then tap Next image'
+    : 'Left no, right like, up super like';
+  if (marking) clearSwipeBadges();
+}
+
+function clearMaskDrawing() {
+  maskPaths = [];
+  activePath = null;
+  isDrawing = false;
+  redrawMaskCanvas();
+  updateMaskUi();
+}
+
+function setMaskMode(marking) {
+  reviewState.mask = marking ? 'mark' : 'clear';
+  updateMaskUi();
+}
+
+function getCanvasPoint(event) {
+  const rect = maskCanvas.getBoundingClientRect();
+  const source = event.touches ? event.touches[0] : event;
+  return { x: source.clientX - rect.left, y: source.clientY - rect.top };
+}
+
+function startMaskStroke(event) {
+  if (reviewState.mask !== 'mark') return;
+  event.preventDefault();
+  isDrawing = true;
+  activePath = [getCanvasPoint(event)];
+  redrawMaskCanvas();
+}
+
+function extendMaskStroke(event) {
+  if (!isDrawing || reviewState.mask !== 'mark' || !activePath) return;
+  event.preventDefault();
+  activePath.push(getCanvasPoint(event));
+  redrawMaskCanvas();
+}
+
+function endMaskStroke(event) {
+  if (!isDrawing || reviewState.mask !== 'mark') return;
+  event?.preventDefault?.();
+  if (activePath && activePath.length > 1) {
+    maskPaths.push(activePath);
+  }
+  activePath = null;
+  isDrawing = false;
+  redrawMaskCanvas();
+  updateMaskUi();
+}
+
+function detectSwipeDecision(dx, dy) {
+  if (-dy > 110 && Math.abs(dy) > Math.abs(dx) + 20) return 'super_like';
+  if (dx > 95) return 'like';
+  if (dx < -95) return 'not_like';
+  return null;
+}
+
+function applySwipeVisual(dx, dy) {
+  const rotation = Math.max(-16, Math.min(16, dx / 14));
+  const lift = dy < 0 ? dy : dy * 0.2;
+  imageStage.style.transform = `translate3d(${dx}px, ${lift}px, 0) rotate(${rotation}deg)`;
+  updateSwipeBadges(detectSwipeDecision(dx, dy));
+}
+
+function beginSwipe(event) {
+  if (reviewState.mask === 'mark' || isDrawing) return;
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  swipeGesture = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY };
+  swipeDelta = { x: 0, y: 0 };
+  imageStage.style.transition = 'none';
+  imageStage.setPointerCapture?.(event.pointerId);
+}
+
+function moveSwipe(event) {
+  if (!swipeGesture || event.pointerId !== swipeGesture.pointerId) return;
+  event.preventDefault();
+  swipeDelta = {
+    x: event.clientX - swipeGesture.startX,
+    y: event.clientY - swipeGesture.startY
+  };
+  applySwipeVisual(swipeDelta.x, swipeDelta.y);
+}
+
+function completeSwipeDecision(decision) {
+  reviewState.verdict = decision;
+  updateSwipeBadges(decision);
+  imageStage.style.transition = 'transform .24s ease, opacity .24s ease';
+
+  if (decision === 'super_like') {
+    imageStage.style.transform = 'translate3d(0,-140px,0) scale(.96)';
+  } else if (decision === 'like') {
+    imageStage.style.transform = 'translate3d(140px,-10px,0) rotate(14deg)';
+  } else {
+    imageStage.style.transform = 'translate3d(-140px,-10px,0) rotate(-14deg)';
+  }
+
+  imageStage.style.opacity = '.08';
+  window.setTimeout(() => advance(false), 220);
+}
+
+function beginFailureReview() {
+  if ($('img-skeleton').style.display !== 'none') return;
+  reviewState.verdict = 'not_like';
+  swipeGesture = null;
+  swipeDelta = { x: 0, y: 0 };
+  imageStage.style.transition = 'transform .18s ease, opacity .18s ease';
+  imageStage.style.transform = 'translate3d(0,0,0) rotate(0deg)';
+  imageStage.style.opacity = '1';
+  setMaskMode(true);
+}
+
+function endSwipe(event) {
+  if (!swipeGesture || event.pointerId !== swipeGesture.pointerId) return;
+  if (imageStage.hasPointerCapture?.(event.pointerId)) {
+    imageStage.releasePointerCapture(event.pointerId);
+  }
+  const decision = detectSwipeDecision(swipeDelta.x, swipeDelta.y);
+  swipeGesture = null;
+  if (decision === 'not_like') beginFailureReview();
+  else if (decision) completeSwipeDecision(decision);
+  else resetSwipeCard();
+}
+
+function cancelSwipe(event) {
+  if (!swipeGesture || event.pointerId !== swipeGesture.pointerId) return;
+  if (imageStage.hasPointerCapture?.(event.pointerId)) {
+    imageStage.releasePointerCapture(event.pointerId);
+  }
+  swipeGesture = null;
+  resetSwipeCard();
+}
+
+function buildImageResult(img, skipped) {
+  if (skipped) {
+    return {
+      id: img.id,
+      name: img.name,
+      verdict: 'skip',
+      failure_points: null,
+      mask_binary: 'no',
+      masked_areas: 0,
+      mask_data_url: null,
+      notes: ''
+    };
+  }
+
+  return {
+    id: img.id,
+    name: img.name,
+    verdict: reviewState.verdict,
+    failure_points: maskPaths.length ? 'mark' : 'clear',
+    mask_binary: maskPaths.length ? 'yes' : 'no',
+    masked_areas: maskPaths.length,
+    mask_data_url: maskPaths.length ? maskCanvas.toDataURL('image/png') : null,
+    notes: $('notes-input').value.trim()
+  };
+}
+
+function humanizeVerdict(value) {
+  if (value === 'not_like') return 'Not like';
+  return value === 'super_like' ? 'Super like' : 'Like';
+}
+
+function humanizeMask(value, count) {
+  if (value === 'mark') return `${count} marked ${count === 1 ? 'area' : 'areas'}`;
+  return 'No marked failure points';
+}
+
+function loadImage(idx) {
+  const img = images[idx];
+  $('progress-pill').textContent = `${idx + 1} / ${images.length}`;
+  $('notes-input').value = '';
+  resetReviewState();
+  clearMaskDrawing();
+  $('image-stage').style.display = 'none';
+  updateMaskUi();
+
+  $('img-skeleton').style.display = 'block';
+  const el = $('eval-img');
+  el.onload = () => {
+    $('img-skeleton').style.display = 'none';
+    $('image-stage').style.display = 'inline-flex';
+    resizeMaskCanvas();
+    updateMaskUi();
+    resetSwipeCard(true);
+  };
+  el.onerror = () => {
+    $('img-skeleton').style.display = 'none';
+    $('image-stage').style.display = 'inline-flex';
+    el.alt = '(preview unavailable)';
+    resizeMaskCanvas();
+    updateMaskUi();
+    resetSwipeCard(true);
+  };
+  el.src = img.url;
+}
+
+async function advance(skipped) {
+  if (!skipped && reviewState.verdict === 'not_like') {
+    const hasNotes = $('notes-input').value.trim().length > 0;
+    if (!maskPaths.length || !hasNotes) return;
+  }
+  const img = images[current];
+  results.push(buildImageResult(img, skipped));
+  current += 1;
+  if (current >= images.length) {
+    await finishEval();
+  } else {
+    loadImage(current);
+  }
+}
+
+function returnToSwipeMode() {
+  $('notes-input').value = '';
+  resetReviewState();
+  maskPaths = [];
+  activePath = null;
+  isDrawing = false;
+  redrawMaskCanvas();
+  updateMaskUi();
+  resetSwipeCard(true);
+}
+
+async function finishEval() {
+  const rated = results.filter(item => item.verdict !== 'skip');
+  const likes = rated.filter(item => item.verdict === 'like' || item.verdict === 'super_like');
+  const superLikes = rated.filter(item => item.verdict === 'super_like');
+  const notLikes = rated.filter(item => item.verdict === 'not_like');
+  const markedIssues = rated.filter(item => item.failure_points === 'mark');
+
+  $('s-total').textContent = rated.length;
+  $('s-like').textContent = likes.length;
+  $('s-super').textContent = superLikes.length;
+  $('s-nope').textContent = notLikes.length;
+  $('s-mask').textContent = markedIssues.length;
+
+  try {
+    const response = await fetch('/api/save-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        batch_name: batchLabel,
+        image_dir: reviewFolder,
+        results
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Could not save results.');
+    $('saved-path').textContent = payload.output_path;
+    $('done-copy').textContent = `Saved ${payload.reviewed_count} reviews locally.`;
+  } catch (error) {
+    $('saved-path').textContent = 'Save failed';
+    $('done-copy').textContent = error.message;
+  }
+
+  show('done-screen');
+}
+
+async function bootstrap() {
+  try {
+    const response = await fetch('/api/bootstrap');
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Could not load images.');
+
+    batchLabel = payload.batch_name;
+    reviewFolder = payload.image_dir;
+    outputPath = payload.output_path;
+    $('empty-folder-path').textContent = reviewFolder;
+
+    images = payload.images || [];
+    results = [];
+    current = 0;
+
+    if (!images.length) {
+      show('empty-screen');
+      return;
+    }
+
+    show('eval-screen');
+    loadImage(0);
+  } catch (error) {
+    const message = error.message === 'Failed to fetch'
+      ? 'Backend not reachable. Start the app with `python3 vibe_check_server.py --open` instead of opening the HTML file directly.'
+      : error.message;
+    $('empty-folder-path').textContent = message;
+    show('empty-screen');
+  }
+}
+
+window.addEventListener('resize', resizeMaskCanvas);
+$('clear-mark-btn').addEventListener('click', clearMaskDrawing);
+$('next-btn').addEventListener('click', () => advance(false));
+$('back-btn').addEventListener('click', returnToSwipeMode);
+$('notes-input').addEventListener('input', updateMaskUi);
+$('skip-btn').addEventListener('click', () => advance(true));
+
+maskCanvas.addEventListener('mousedown', startMaskStroke);
+maskCanvas.addEventListener('mousemove', extendMaskStroke);
+window.addEventListener('mouseup', endMaskStroke);
+maskCanvas.addEventListener('mouseleave', endMaskStroke);
+maskCanvas.addEventListener('touchstart', startMaskStroke, { passive: false });
+maskCanvas.addEventListener('touchmove', extendMaskStroke, { passive: false });
+maskCanvas.addEventListener('touchend', endMaskStroke, { passive: false });
+maskCanvas.addEventListener('touchcancel', endMaskStroke, { passive: false });
+
+imageStage.addEventListener('pointerdown', beginSwipe);
+imageStage.addEventListener('pointermove', moveSwipe);
+imageStage.addEventListener('pointerup', endSwipe);
+imageStage.addEventListener('pointercancel', cancelSwipe);
+
+bootstrap();
+</script>
+</body>
+</html>

@@ -1,0 +1,480 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap");
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --text: #1a1814;
+  --muted: #8c8880;
+  --border: rgba(26, 24, 20, 0.1);
+  --border-mid: rgba(26, 24, 20, 0.22);
+  --good: #2d6a4f;
+  --bad: #c1440e;
+  --dark: #1a1814;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+  background: radial-gradient(circle at top, #fffcf6 0%, var(--bg) 42%, #efe8dd 100%);
+  color: var(--text);
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+.screen {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+}
+
+.screen.active {
+  display: flex;
+}
+
+#loading-screen,
+#empty-screen,
+#done-screen {
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  gap: 1.4rem;
+  text-align: center;
+}
+
+.logo-mark {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f7f5f0;
+  font-family: "DM Serif Display", serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+}
+
+.headline h1 {
+  font-family: "DM Serif Display", serif;
+  font-size: 2.25rem;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.headline p {
+  margin-top: 0.55rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+.info-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  padding: 1.1rem 1.15rem;
+  text-align: left;
+  backdrop-filter: blur(8px);
+}
+
+.info-card h2 {
+  font-size: 0.74rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.info-card p,
+.info-card code {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.info-card code {
+  display: block;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(26, 24, 20, 0.04);
+  overflow-wrap: anywhere;
+}
+
+.eval-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.35rem 1.5rem 1rem;
+}
+
+.eval-head-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.eval-title {
+  font-family: "DM Serif Display", serif;
+  font-size: 1.38rem;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.pill {
+  background: rgba(26, 24, 20, 0.06);
+  border-radius: 20px;
+  padding: 0.28rem 0.72rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.image-wrap {
+  padding: 0 1.5rem;
+  margin-bottom: 1.2rem;
+}
+
+.image-card {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 22px;
+  overflow: hidden;
+  background: rgba(26, 24, 20, 0.04);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-shadow: 0 20px 40px rgba(26, 24, 20, 0.08);
+}
+
+.image-stage {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.image-card img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 16px;
+}
+
+.skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(26, 24, 20, 0.04) 0%,
+    rgba(26, 24, 20, 0.09) 50%,
+    rgba(26, 24, 20, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.mask-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  touch-action: none;
+}
+
+.mask-canvas.active {
+  display: block;
+  cursor: crosshair;
+}
+
+.swipe-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.swipe-badge {
+  position: absolute;
+  padding: 0.45rem 0.82rem;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: rgba(247, 245, 240, 0.9);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: scale(0.88);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.swipe-badge.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.swipe-badge.nope {
+  top: 18px;
+  left: 18px;
+  color: var(--bad);
+}
+
+.swipe-badge.like {
+  top: 18px;
+  right: 18px;
+  color: var(--good);
+}
+
+.swipe-badge.super {
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.88);
+  color: var(--dark);
+}
+
+.swipe-badge.super.visible {
+  transform: translateX(-50%) scale(1);
+}
+
+.swipe-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  background: rgba(26, 24, 20, 0.72);
+  color: #f7f5f0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.swipe-panel {
+  padding: 0 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.secondary-actions {
+  display: none;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.secondary-actions.active {
+  display: grid;
+}
+
+.swipe-btn {
+  padding: 0.96rem 0.8rem;
+  border-radius: 18px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+  border: 1px solid transparent;
+  background: var(--surface);
+}
+
+.swipe-btn:active {
+  transform: scale(0.98);
+}
+
+.swipe-btn.mark {
+  border: 1px solid var(--border-mid);
+  color: var(--text);
+}
+
+.swipe-btn.next {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: #f7f5f0;
+}
+
+.swipe-btn.back {
+  border: 1px solid var(--border-mid);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.swipe-btn:disabled,
+.skip-btn:disabled,
+.notes-area textarea:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.notes-area {
+  display: none;
+  padding: 0 1.5rem;
+  margin-top: 1rem;
+}
+
+.notes-area.active {
+  display: block;
+}
+
+.notes-area label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.notes-area textarea {
+  width: 100%;
+  border: 1px solid var(--border-mid);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.82);
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+
+.notes-area textarea:focus {
+  border-color: var(--text);
+}
+
+.notes-area textarea::placeholder {
+  color: var(--muted);
+}
+
+.submit-area {
+  padding: 1.3rem 1.5rem;
+  padding-bottom: max(1.3rem, env(safe-area-inset-bottom));
+}
+
+.skip-btn {
+  width: 100%;
+  padding: 0.6rem;
+  background: none;
+  border: none;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.done-mark {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: rgba(45, 106, 79, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+#done-screen h2 {
+  font-family: "DM Serif Display", serif;
+  font-size: 1.9rem;
+  letter-spacing: -0.02em;
+}
+
+#done-screen p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+.stats-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 16px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.stat-card .sn {
+  font-family: "DM Serif Display", serif;
+  font-size: 1.9rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.stat-card .sl {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.stat-card.good-card .sn {
+  color: var(--good);
+}
+
+.stat-card.alert-card .sn {
+  color: var(--bad);
+}
+
+@media (max-width: 420px) {
+  .secondary-actions,
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .swipe-hint {
+    font-size: 0.68rem;
+  }
+}

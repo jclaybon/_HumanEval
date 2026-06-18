@@ -1,0 +1,16 @@
+name = "underscore-humaneval-worker"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "underscorehumaneval"
+
+[[kv_namespaces]]
+binding = "KV_RESULTS"
+id = "9c3c0ac825194bf08d5ba395c382438a"
+
+[[d1_databases]]
+binding = "humaneval_db"
+database_name = "humaneval-db"
+database_id = "9f764654-cc1e-4361-a411-052ca12b496c"

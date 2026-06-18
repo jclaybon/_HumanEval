@@ -1,0 +1,7 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+frontend/dist/
+frontend/node_modules/
+data/outputs/*.json

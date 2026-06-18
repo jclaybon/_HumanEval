@@ -1,0 +1,712 @@
+import { startTransition, useEffect, useRef, useState } from "react";
+import DoneScreen from "./components/DoneScreen";
+import EmptyScreen from "./components/EmptyScreen";
+import EvalScreen from "./components/EvalScreen";
+import LoadingScreen from "./components/LoadingScreen";
+
+const initialReviewState = {
+  verdict: null,
+  maskMode: false,
+  notes: ""
+};
+
+const emptyStats = {
+  reviewedCount: 0,
+  likes: 0,
+  superLikes: 0,
+  notLikes: 0,
+  markedIssues: 0
+};
+
+const defaultStageStyle = {
+  transition: "transform .2s ease, opacity .2s ease",
+  transform: "translate3d(0, 0, 0) rotate(0deg)",
+  opacity: 1
+};
+
+function detectSwipeDecision(dx, dy) {
+  if (-dy > 110 && Math.abs(dy) > Math.abs(dx) + 20) {
+    return "super_like";
+  }
+  if (dx > 95) {
+    return "like";
+  }
+  if (dx < -95) {
+    return "not_like";
+  }
+  return null;
+}
+
+function computeSummary(results) {
+  const rated = results.filter((item) => item.verdict !== "skip");
+  const likes = rated.filter(
+    (item) => item.verdict === "like" || item.verdict === "super_like"
+  );
+  const superLikes = rated.filter((item) => item.verdict === "super_like");
+  const notLikes = rated.filter((item) => item.verdict === "not_like");
+  const markedIssues = rated.filter((item) => item.failure_points === "mark");
+
+  return {
+    reviewedCount: rated.length,
+    likes: likes.length,
+    superLikes: superLikes.length,
+    notLikes: notLikes.length,
+    markedIssues: markedIssues.length
+  };
+}
+
+function buildImageResult(image, reviewState, maskPaths, canvas, skipped) {
+  if (skipped) {
+    return {
+      id: image.id,
+      name: image.name,
+      verdict: "skip",
+      failure_points: null,
+      mask_binary: "no",
+      masked_areas: 0,
+      mask_data_url: null,
+      notes: ""
+    };
+  }
+
+  return {
+    id: image.id,
+    name: image.name,
+    verdict: reviewState.verdict,
+    failure_points: maskPaths.length ? "mark" : "clear",
+    mask_binary: maskPaths.length ? "yes" : "no",
+    masked_areas: maskPaths.length,
+    mask_data_url: maskPaths.length && canvas ? canvas.toDataURL("image/png") : null,
+    notes: reviewState.notes.trim()
+  };
+}
+
+function friendlyLoadMessage(error) {
+  if (error instanceof Error && error.message === "Failed to fetch") {
+    return (
+      "Backend not reachable. Start the Python server with " +
+      "`python3 vibe_check_server.py` before opening the React frontend."
+    );
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Could not load images.";
+}
+
+export default function App() {
+  const [screen, setScreen] = useState("loading");
+  const [loadingCopy, setLoadingCopy] = useState({
+    title: "Loading images",
+    description: "Looking for files in the configured review source."
+  });
+  const [emptyView, setEmptyView] = useState({
+    title: "No images found",
+    description: "Add images to the configured review source, then refresh this page.",
+    detailLabel: "Review source",
+    detail: "-"
+  });
+  const [batchInfo, setBatchInfo] = useState({
+    batchName: "",
+    reviewSource: "",
+    outputPath: ""
+  });
+  const [images, setImages] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [results, setResults] = useState([]);
+  const [reviewState, setReviewState] = useState(initialReviewState);
+  const [maskPaths, setMaskPaths] = useState([]);
+  const [imageReady, setImageReady] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [swipePreview, setSwipePreview] = useState(null);
+  const [stageStyle, setStageStyle] = useState(defaultStageStyle);
+  const [doneView, setDoneView] = useState({
+    doneCopy: "Results were saved locally.",
+    savedPath: "-",
+    stats: emptyStats
+  });
+
+  const imageStageRef = useRef(null);
+  const imageRef = useRef(null);
+  const maskCanvasRef = useRef(null);
+  const swipeGestureRef = useRef(null);
+  const swipeDeltaRef = useRef({ x: 0, y: 0 });
+  const drawingPointerIdRef = useRef(null);
+  const activePathRef = useRef(null);
+  const isDrawingRef = useRef(false);
+  const advanceTimerRef = useRef(null);
+  const resetAnimationFrameRef = useRef(null);
+
+  const batchInfoRef = useRef(batchInfo);
+  const imagesRef = useRef(images);
+  const currentIndexRef = useRef(currentIndex);
+  const resultsRef = useRef(results);
+  const reviewStateRef = useRef(reviewState);
+  const maskPathsRef = useRef(maskPaths);
+
+  const currentImage = images[currentIndex] ?? null;
+  const swipeHint = reviewState.maskMode
+    ? "Circle failure points, add a note, then tap Next image"
+    : "Left no, right like, up super like";
+
+  function setBatchInfoValue(nextValue) {
+    batchInfoRef.current = nextValue;
+    setBatchInfo(nextValue);
+  }
+
+  function setImagesValue(nextValue) {
+    imagesRef.current = nextValue;
+    setImages(nextValue);
+  }
+
+  function setCurrentIndexValue(nextValue) {
+    currentIndexRef.current = nextValue;
+    setCurrentIndex(nextValue);
+  }
+
+  function setResultsValue(nextValue) {
+    resultsRef.current = nextValue;
+    setResults(nextValue);
+  }
+
+  function setReviewStateValue(nextValue) {
+    reviewStateRef.current = nextValue;
+    setReviewState(nextValue);
+  }
+
+  function patchReviewState(patch) {
+    const nextValue = {
+      ...reviewStateRef.current,
+      ...patch
+    };
+    setReviewStateValue(nextValue);
+    return nextValue;
+  }
+
+  function setMaskPathsValue(nextValue) {
+    maskPathsRef.current = nextValue;
+    setMaskPaths(nextValue);
+  }
+
+  function redrawMaskCanvas(paths = maskPathsRef.current, activePath = activePathRef.current) {
+    const canvas = maskCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.lineWidth = 6;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.strokeStyle = "rgba(193, 68, 14, 0.95)";
+
+    for (const path of paths) {
+      if (!path.length) {
+        continue;
+      }
+      context.beginPath();
+      context.moveTo(path[0].x, path[0].y);
+      for (const point of path.slice(1)) {
+        context.lineTo(point.x, point.y);
+      }
+      context.stroke();
+    }
+
+    if (activePath && activePath.length) {
+      context.beginPath();
+      context.moveTo(activePath[0].x, activePath[0].y);
+      for (const point of activePath.slice(1)) {
+        context.lineTo(point.x, point.y);
+      }
+      context.stroke();
+    }
+  }
+
+  function resizeMaskCanvas() {
+    const imageElement = imageRef.current;
+    const canvas = maskCanvasRef.current;
+    if (!imageElement || !canvas || !imageElement.clientWidth || !imageElement.clientHeight) {
+      return;
+    }
+
+    canvas.width = imageElement.clientWidth;
+    canvas.height = imageElement.clientHeight;
+    canvas.style.width = `${imageElement.clientWidth}px`;
+    canvas.style.height = `${imageElement.clientHeight}px`;
+    redrawMaskCanvas();
+  }
+
+  function resetSwipeCard(immediate = false) {
+    swipeGestureRef.current = null;
+    swipeDeltaRef.current = { x: 0, y: 0 };
+    setSwipePreview(null);
+
+    if (resetAnimationFrameRef.current) {
+      cancelAnimationFrame(resetAnimationFrameRef.current);
+      resetAnimationFrameRef.current = null;
+    }
+
+    setStageStyle({
+      transition: immediate ? "none" : defaultStageStyle.transition,
+      transform: defaultStageStyle.transform,
+      opacity: defaultStageStyle.opacity
+    });
+
+    if (immediate) {
+      resetAnimationFrameRef.current = requestAnimationFrame(() => {
+        setStageStyle((currentValue) => ({
+          ...currentValue,
+          transition: defaultStageStyle.transition
+        }));
+      });
+    }
+  }
+
+  function clearMaskDrawing() {
+    activePathRef.current = null;
+    isDrawingRef.current = false;
+    drawingPointerIdRef.current = null;
+    setMaskPathsValue([]);
+    redrawMaskCanvas([], null);
+  }
+
+  function getCanvasPoint(event) {
+    const canvas = maskCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    };
+  }
+
+  function startMaskStroke(event) {
+    if (!reviewStateRef.current.maskMode) {
+      return;
+    }
+
+    event.preventDefault();
+    drawingPointerIdRef.current = event.pointerId;
+    isDrawingRef.current = true;
+    activePathRef.current = [getCanvasPoint(event)];
+    maskCanvasRef.current?.setPointerCapture?.(event.pointerId);
+    redrawMaskCanvas(maskPathsRef.current, activePathRef.current);
+  }
+
+  function extendMaskStroke(event) {
+    if (
+      !isDrawingRef.current ||
+      !reviewStateRef.current.maskMode ||
+      event.pointerId !== drawingPointerIdRef.current ||
+      !activePathRef.current
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    activePathRef.current = activePathRef.current.concat(getCanvasPoint(event));
+    redrawMaskCanvas(maskPathsRef.current, activePathRef.current);
+  }
+
+  function endMaskStroke(event) {
+    if (!isDrawingRef.current || event.pointerId !== drawingPointerIdRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (maskCanvasRef.current?.hasPointerCapture?.(event.pointerId)) {
+      maskCanvasRef.current.releasePointerCapture(event.pointerId);
+    }
+
+    const completedPath = activePathRef.current;
+    activePathRef.current = null;
+    isDrawingRef.current = false;
+    drawingPointerIdRef.current = null;
+
+    if (completedPath && completedPath.length > 1) {
+      const nextPaths = maskPathsRef.current.concat([completedPath]);
+      setMaskPathsValue(nextPaths);
+      redrawMaskCanvas(nextPaths, null);
+      return;
+    }
+
+    redrawMaskCanvas(maskPathsRef.current, null);
+  }
+
+  function beginFailureReview() {
+    patchReviewState({
+      verdict: "not_like",
+      maskMode: true
+    });
+    setSwipePreview(null);
+    setStageStyle({
+      transition: "transform .18s ease, opacity .18s ease",
+      transform: defaultStageStyle.transform,
+      opacity: 1
+    });
+  }
+
+  function applySwipeVisual(dx, dy) {
+    const rotation = Math.max(-16, Math.min(16, dx / 14));
+    const lift = dy < 0 ? dy : dy * 0.2;
+    setStageStyle((currentValue) => ({
+      ...currentValue,
+      transition: "none",
+      transform: `translate3d(${dx}px, ${lift}px, 0) rotate(${rotation}deg)`,
+      opacity: 1
+    }));
+    setSwipePreview(detectSwipeDecision(dx, dy));
+  }
+
+  function beginSwipe(event) {
+    if (reviewStateRef.current.maskMode || isDrawingRef.current) {
+      return;
+    }
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    swipeGestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY
+    };
+    swipeDeltaRef.current = { x: 0, y: 0 };
+    setStageStyle((currentValue) => ({
+      ...currentValue,
+      transition: "none"
+    }));
+    imageStageRef.current?.setPointerCapture?.(event.pointerId);
+  }
+
+  function moveSwipe(event) {
+    if (!swipeGestureRef.current || event.pointerId !== swipeGestureRef.current.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    swipeDeltaRef.current = {
+      x: event.clientX - swipeGestureRef.current.startX,
+      y: event.clientY - swipeGestureRef.current.startY
+    };
+    applySwipeVisual(swipeDeltaRef.current.x, swipeDeltaRef.current.y);
+  }
+
+  async function advance(skipped) {
+    const image = imagesRef.current[currentIndexRef.current];
+    if (!image) {
+      return;
+    }
+
+    if (!skipped && reviewStateRef.current.verdict === "not_like") {
+      const hasNotes = reviewStateRef.current.notes.trim().length > 0;
+      if (!maskPathsRef.current.length || !hasNotes) {
+        return;
+      }
+    }
+
+    const nextResult = buildImageResult(
+      image,
+      reviewStateRef.current,
+      maskPathsRef.current,
+      maskCanvasRef.current,
+      skipped
+    );
+    const nextResults = resultsRef.current.concat(nextResult);
+    setResultsValue(nextResults);
+
+    const nextIndex = currentIndexRef.current + 1;
+    setCurrentIndexValue(nextIndex);
+
+    if (nextIndex >= imagesRef.current.length) {
+      await finishEval(nextResults);
+    }
+  }
+
+  function completeSwipeDecision(decision) {
+    patchReviewState({ verdict: decision });
+    setSwipePreview(decision);
+    setStageStyle({
+      transition: "transform .24s ease, opacity .24s ease",
+      transform:
+        decision === "super_like"
+          ? "translate3d(0, -140px, 0) scale(.96)"
+          : decision === "like"
+            ? "translate3d(140px, -10px, 0) rotate(14deg)"
+            : "translate3d(-140px, -10px, 0) rotate(-14deg)",
+      opacity: 0.08
+    });
+
+    window.clearTimeout(advanceTimerRef.current);
+    advanceTimerRef.current = window.setTimeout(() => {
+      advance(false);
+    }, 220);
+  }
+
+  function endSwipe(event) {
+    if (!swipeGestureRef.current || event.pointerId !== swipeGestureRef.current.pointerId) {
+      return;
+    }
+
+    if (imageStageRef.current?.hasPointerCapture?.(event.pointerId)) {
+      imageStageRef.current.releasePointerCapture(event.pointerId);
+    }
+
+    const decision = detectSwipeDecision(swipeDeltaRef.current.x, swipeDeltaRef.current.y);
+    swipeGestureRef.current = null;
+
+    if (decision === "not_like") {
+      beginFailureReview();
+      return;
+    }
+
+    if (decision) {
+      completeSwipeDecision(decision);
+      return;
+    }
+
+    resetSwipeCard();
+  }
+
+  function cancelSwipe(event) {
+    if (!swipeGestureRef.current || event.pointerId !== swipeGestureRef.current.pointerId) {
+      return;
+    }
+
+    if (imageStageRef.current?.hasPointerCapture?.(event.pointerId)) {
+      imageStageRef.current.releasePointerCapture(event.pointerId);
+    }
+
+    swipeGestureRef.current = null;
+    resetSwipeCard();
+  }
+
+  function returnToSwipeMode() {
+    window.clearTimeout(advanceTimerRef.current);
+    setReviewStateValue(initialReviewState);
+    clearMaskDrawing();
+    setImageError(false);
+    resetSwipeCard(true);
+  }
+
+  async function finishEval(finalResults) {
+    const summary = computeSummary(finalResults);
+
+    setLoadingCopy({
+      title: "Saving results",
+      description: "Writing this batch to disk."
+    });
+    setScreen("saving");
+
+    try {
+      const response = await fetch("/api/save-results", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          batch_name: batchInfoRef.current.batchName,
+          image_dir: batchInfoRef.current.reviewSource,
+          results: finalResults
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not save results.");
+      }
+
+      setDoneView({
+        doneCopy: `Saved ${payload.reviewed_count} reviews locally.`,
+        savedPath: payload.output_path,
+        stats: {
+          reviewedCount: payload.reviewed_count,
+          likes: payload.likes,
+          superLikes: payload.super_likes,
+          notLikes: payload.not_likes,
+          markedIssues: payload.marked_issues
+        }
+      });
+    } catch (error) {
+      setDoneView({
+        doneCopy: error instanceof Error ? error.message : "Could not save results.",
+        savedPath: "Save failed",
+        stats: summary
+      });
+    }
+
+    setScreen("done");
+  }
+
+  function handleNotesChange(event) {
+    patchReviewState({ notes: event.target.value });
+  }
+
+  function handleImageLoad() {
+    setImageReady(true);
+    setImageError(false);
+    resizeMaskCanvas();
+    resetSwipeCard(true);
+  }
+
+  function handleImageError() {
+    setImageReady(true);
+    setImageError(true);
+    resizeMaskCanvas();
+    resetSwipeCard(true);
+  }
+
+  useEffect(() => {
+    async function bootstrap() {
+      try {
+        const response = await fetch("/api/bootstrap");
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Could not load images.");
+        }
+
+        const nextBatchInfo = {
+          batchName: payload.batch_name,
+          reviewSource: payload.image_dir,
+          outputPath: payload.output_path
+        };
+        const nextImages = payload.images || [];
+
+        startTransition(() => {
+          setBatchInfoValue(nextBatchInfo);
+          setImagesValue(nextImages);
+          setResultsValue([]);
+          setCurrentIndexValue(0);
+
+          if (nextImages.length) {
+            setScreen("eval");
+            return;
+          }
+
+          setEmptyView({
+            title: "No images found",
+            description:
+              "Add images to the configured review source, then refresh this page.",
+            detailLabel: "Review source",
+            detail: nextBatchInfo.reviewSource
+          });
+          setScreen("empty");
+        });
+      } catch (error) {
+        setEmptyView({
+          title: "Could not load images",
+          description: "The frontend could not load the review batch.",
+          detailLabel: "Details",
+          detail: friendlyLoadMessage(error)
+        });
+        setScreen("empty");
+      }
+    }
+
+    bootstrap();
+
+    return () => {
+      window.clearTimeout(advanceTimerRef.current);
+      if (resetAnimationFrameRef.current) {
+        cancelAnimationFrame(resetAnimationFrameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleResize() {
+      resizeMaskCanvas();
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (screen !== "eval" || !currentImage) {
+      return;
+    }
+
+    window.clearTimeout(advanceTimerRef.current);
+    setReviewStateValue(initialReviewState);
+    setMaskPathsValue([]);
+    activePathRef.current = null;
+    isDrawingRef.current = false;
+    drawingPointerIdRef.current = null;
+    setImageReady(false);
+    setImageError(false);
+    redrawMaskCanvas([], null);
+    resetSwipeCard(true);
+  }, [screen, currentImage]);
+
+  if (screen === "loading" || screen === "saving") {
+    return (
+      <LoadingScreen
+        title={loadingCopy.title}
+        description={loadingCopy.description}
+      />
+    );
+  }
+
+  if (screen === "empty") {
+    return (
+      <EmptyScreen
+        title={emptyView.title}
+        description={emptyView.description}
+        detailLabel={emptyView.detailLabel}
+        detail={emptyView.detail}
+      />
+    );
+  }
+
+  if (screen === "done") {
+    return (
+      <DoneScreen
+        doneCopy={doneView.doneCopy}
+        savedPath={doneView.savedPath}
+        stats={doneView.stats}
+      />
+    );
+  }
+
+  return (
+    <EvalScreen
+      image={currentImage}
+      currentIndex={currentIndex}
+      total={images.length}
+      imageReady={imageReady}
+      imageError={imageError}
+      reviewState={reviewState}
+      maskPathsCount={maskPaths.length}
+      swipePreview={swipePreview}
+      swipeHint={swipeHint}
+      stageStyle={stageStyle}
+      imageStageRef={imageStageRef}
+      imageRef={imageRef}
+      maskCanvasRef={maskCanvasRef}
+      onImageLoad={handleImageLoad}
+      onImageError={handleImageError}
+      onStagePointerDown={beginSwipe}
+      onStagePointerMove={moveSwipe}
+      onStagePointerUp={endSwipe}
+      onStagePointerCancel={cancelSwipe}
+      onMaskPointerDown={startMaskStroke}
+      onMaskPointerMove={extendMaskStroke}
+      onMaskPointerUp={endMaskStroke}
+      onMaskPointerCancel={endMaskStroke}
+      onNotesChange={handleNotesChange}
+      onBack={returnToSwipeMode}
+      onNext={() => advance(false)}
+      onClearMarks={clearMaskDrawing}
+      onSkip={() => advance(true)}
+    />
+  );
+}
