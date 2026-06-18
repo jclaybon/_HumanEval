@@ -504,7 +504,7 @@ export default function App() {
     setScreen("saving");
 
     try {
-      const response = await fetch("/api/save-results", {
+      const response = await fetch("https://underscore-humaneval-worker.humaneval.workers.dev/api/save-results", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -564,7 +564,7 @@ export default function App() {
   useEffect(() => {
     async function bootstrap() {
       try {
-        const response = await fetch("/api/bootstrap");
+        const response = await fetch("https://underscore-humaneval-worker.humaneval.workers.dev/api/bootstrap");
         const payload = await response.json();
 
         if (!response.ok) {

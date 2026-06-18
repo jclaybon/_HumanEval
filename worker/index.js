@@ -1,5 +1,11 @@
 const SUPPORTED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
 function isSupported(name) {
   const lower = name.toLowerCase();
   return SUPPORTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
@@ -28,7 +34,7 @@ function extMimeType(name) {
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
+    headers: { "Content-Type": "application/json; charset=utf-8", ...CORS_HEADERS },
   });
 }
 
@@ -63,6 +69,11 @@ export default {
     const url = new URL(request.url);
     const { pathname } = url;
 
+    // Handle CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
     // Bootstrap — list images from R2
     if (pathname === "/api/bootstrap" && request.method === "GET") {
       try {
@@ -90,6 +101,7 @@ export default {
       const headers = new Headers();
       headers.set("Content-Type", obj.httpMetadata?.contentType || extMimeType(key));
       headers.set("Cache-Control", "public, max-age=86400");
+      Object.entries(CORS_HEADERS).forEach(([k, v]) => headers.set(k, v));
       return new Response(obj.body, { headers });
     }
 
