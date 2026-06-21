@@ -2,6 +2,7 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import DoneScreen from "./components/DoneScreen";
 import EmptyScreen from "./components/EmptyScreen";
 import EvalScreen from "./components/EvalScreen";
+import HomeScreen from "./components/HomeScreen";
 import LoadingScreen from "./components/LoadingScreen";
 
 const initialReviewState = {
@@ -38,7 +39,8 @@ function detectSwipeDecision(dx, dy) {
 }
 
 function computeSummary(results) {
-  const rated = results.filter((item) => item.verdict !== "skip");
+  const completed = results.filter(Boolean);
+  const rated = completed.filter((item) => item.verdict !== "skip");
   const likes = rated.filter(
     (item) => item.verdict === "like" || item.verdict === "super_like"
   );
@@ -417,15 +419,23 @@ export default function App() {
       maskCanvasRef.current,
       skipped
     );
-    const nextResults = resultsRef.current.concat(nextResult);
+    const nextResults = resultsRef.current.slice();
+    nextResults[currentIndexRef.current] = nextResult;
     setResultsValue(nextResults);
 
     const nextIndex = currentIndexRef.current + 1;
-    setCurrentIndexValue(nextIndex);
-
-    if (nextIndex >= imagesRef.current.length) {
-      await finishEval(nextResults);
+    if (nextIndex < imagesRef.current.length) {
+      setCurrentIndexValue(nextIndex);
+      return;
     }
+
+    const pendingIndex = nextResults.findIndex((item) => item === null);
+    if (pendingIndex === -1) {
+      await finishEval(nextResults);
+      return;
+    }
+
+    setCurrentIndexValue(pendingIndex);
   }
 
   function completeSwipeDecision(decision) {
@@ -446,6 +456,23 @@ export default function App() {
     advanceTimerRef.current = window.setTimeout(() => {
       advance(false);
     }, 220);
+  }
+
+  function goToImage(nextIndex) {
+    if (nextIndex < 0 || nextIndex >= imagesRef.current.length) {
+      return;
+    }
+
+    window.clearTimeout(advanceTimerRef.current);
+    setCurrentIndexValue(nextIndex);
+  }
+
+  function handlePreviousImage() {
+    if (!imageReady || reviewStateRef.current.maskMode) {
+      return;
+    }
+
+    goToImage(currentIndexRef.current - 1);
   }
 
   function endSwipe(event) {
@@ -495,7 +522,8 @@ export default function App() {
   }
 
   async function finishEval(finalResults) {
-    const summary = computeSummary(finalResults);
+    const normalizedResults = finalResults.filter(Boolean);
+    const summary = computeSummary(normalizedResults);
 
     setLoadingCopy({
       title: "Saving results",
@@ -512,7 +540,7 @@ export default function App() {
         body: JSON.stringify({
           batch_name: batchInfoRef.current.batchName,
           image_dir: batchInfoRef.current.reviewSource,
-          results: finalResults
+          results: normalizedResults
         })
       });
       const payload = await response.json();
@@ -581,11 +609,11 @@ export default function App() {
         startTransition(() => {
           setBatchInfoValue(nextBatchInfo);
           setImagesValue(nextImages);
-          setResultsValue([]);
+          setResultsValue(nextImages.map(() => null));
           setCurrentIndexValue(0);
 
           if (nextImages.length) {
-            setScreen("eval");
+            setScreen("home");
             return;
           }
 
@@ -667,6 +695,14 @@ export default function App() {
     );
   }
 
+  if (screen === "home") {
+    return (
+      <HomeScreen
+        onStart={() => setScreen("eval")}
+      />
+    );
+  }
+
   if (screen === "done") {
     return (
       <DoneScreen
@@ -703,6 +739,8 @@ export default function App() {
       onMaskPointerUp={endMaskStroke}
       onMaskPointerCancel={endMaskStroke}
       onNotesChange={handleNotesChange}
+      canGoPreviousImage={currentIndex > 0}
+      onPreviousImage={handlePreviousImage}
       onBack={returnToSwipeMode}
       onNext={() => advance(false)}
       onClearMarks={clearMaskDrawing}

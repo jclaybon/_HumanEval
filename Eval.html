@@ -457,6 +457,40 @@
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
   }
 
+  .desktop-nav {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .desktop-prev-btn {
+    display: none;
+    width: 100%;
+    padding: 1.05rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s, border-color 0.15s;
+  }
+
+  .desktop-prev-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .desktop-prev-btn:not(:disabled):hover {
+    border-color: rgba(26,24,20,0.35);
+  }
+
+  .desktop-prev-btn:not(:disabled):active {
+    transform: scale(0.98);
+  }
+
   .submit-btn {
     width: 100%;
     padding: 1.05rem;
@@ -589,6 +623,16 @@
 
   /* util */
   .hidden { display: none !important; }
+
+  @media (hover: hover) and (pointer: fine) {
+    .desktop-nav {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    }
+
+    .desktop-prev-btn {
+      display: block;
+    }
+  }
 </style>
 </head>
 <body>
@@ -700,7 +744,10 @@
   </div>
 
   <div class="submit-area">
-    <button class="submit-btn" id="submit-btn" disabled>Next image →</button>
+    <div class="desktop-nav">
+      <button class="desktop-prev-btn" id="prev-btn" type="button">← Previous image</button>
+      <button class="submit-btn" id="submit-btn" type="button" disabled>Next image →</button>
+    </div>
     <button class="skip-btn" id="skip-btn">Skip this one</button>
   </div>
 </div>
@@ -743,9 +790,10 @@
 
 <script>
 const $ = id => document.getElementById(id);
+const qualityLabels = ['', 'Poor', 'Poor', 'Below avg', 'Below avg', 'Average', 'Average', 'Good', 'Good', 'Great', 'Excellent'];
 
 // State
-let files = [], current = 0, results = [];
+let files = [], current = 0, results = [], drafts = [];
 let faithScore = null, vibeScore = null;
 
 // ── File loading ──
@@ -772,7 +820,8 @@ function loadFiles(arr) {
 
 $('start-btn').addEventListener('click', () => {
   current = 0;
-  results = [];
+  results = new Array(files.length).fill(null);
+  drafts = new Array(files.length).fill(null);
   showEval();
 });
 
@@ -784,6 +833,63 @@ function showEval() {
   loadImage(current);
 }
 
+function makePartialDraft() {
+  if (!files[current]) return null;
+  return {
+    filename: files[current].name,
+    faithfulness: faithScore,
+    quality: parseInt($('quality-range').value, 10),
+    vibe: vibeScore,
+    notes: $('notes-input').value.trim(),
+    skipped: false
+  };
+}
+
+function clearCurrentSelections() {
+  $('notes-input').value = '';
+  $('quality-range').value = 5;
+  $('quality-label').textContent = '—';
+
+  faithScore = null;
+  document.querySelectorAll('.faith-btn').forEach(b => b.classList.remove('selected'));
+
+  vibeScore = null;
+  $('vibe-pass').className = 'vibe-btn';
+  $('vibe-fail').className = 'vibe-btn';
+}
+
+function applyRecord(record) {
+  clearCurrentSelections();
+
+  if (!record || record.skipped) {
+    updateSubmit();
+    return;
+  }
+
+  faithScore = record.faithfulness ?? null;
+  if (faithScore) {
+    const selectedFaithButton = document.querySelector(`.faith-btn[data-val="${faithScore}"]`);
+    selectedFaithButton?.classList.add('selected');
+  }
+
+  const qualityValue = Number.isInteger(record.quality) ? record.quality : 5;
+  $('quality-range').value = qualityValue;
+  $('quality-label').textContent = qualityLabels[qualityValue] || '—';
+
+  vibeScore = record.vibe ?? null;
+  if (vibeScore === 'pass' || vibeScore === 'fail') {
+    $(vibeScore === 'pass' ? 'vibe-pass' : 'vibe-fail').classList.add(vibeScore);
+  }
+
+  $('notes-input').value = record.notes || '';
+  updateSubmit();
+}
+
+function updateNavButtons() {
+  $('prev-btn').disabled = current === 0;
+  $('submit-btn').textContent = current === files.length - 1 ? 'Finish eval →' : 'Next image →';
+}
+
 function loadImage(idx) {
   const file = files[idx];
   const url = URL.createObjectURL(file);
@@ -792,20 +898,8 @@ function loadImage(idx) {
   $('img-badge').textContent = file.name;
   $('progress-pill').textContent = `${idx + 1} / ${files.length}`;
   $('progress-fill').style.width = `${(idx / files.length) * 100}%`;
-  $('notes-input').value = '';
-  $('quality-range').value = 5;
-  $('quality-label').textContent = '—';
-
-  // reset faith
-  faithScore = null;
-  document.querySelectorAll('.faith-btn').forEach(b => b.classList.remove('selected'));
-
-  // reset vibe
-  vibeScore = null;
-  $('vibe-pass').className = 'vibe-btn';
-  $('vibe-fail').className = 'vibe-btn';
-
-  updateSubmit();
+  applyRecord(results[idx] || drafts[idx]);
+  updateNavButtons();
 }
 
 // Faith buttons
@@ -821,9 +915,8 @@ document.querySelectorAll('.faith-btn').forEach(btn => {
 // Quality slider
 const qualityRange = $('quality-range');
 const qualityLabel = $('quality-label');
-const labels = ['', 'Poor', 'Poor', 'Below avg', 'Below avg', 'Average', 'Average', 'Good', 'Good', 'Great', 'Excellent'];
 qualityRange.addEventListener('input', () => {
-  qualityLabel.textContent = labels[qualityRange.value] || '—';
+  qualityLabel.textContent = qualityLabels[qualityRange.value] || '—';
 });
 
 // Vibe buttons
@@ -843,20 +936,34 @@ function updateSubmit() {
 
 $('submit-btn').addEventListener('click', () => submitAndNext(false));
 $('skip-btn').addEventListener('click', () => submitAndNext(true));
+$('prev-btn').addEventListener('click', goPrevious);
+
+function saveCurrentDraft() {
+  drafts[current] = makePartialDraft();
+}
+
+function goPrevious() {
+  if (current === 0) return;
+  saveCurrentDraft();
+  current -= 1;
+  loadImage(current);
+}
 
 function submitAndNext(skipped) {
   if (!skipped) {
-    results.push({
+    results[current] = {
       filename: files[current].name,
       faithfulness: faithScore,
       quality: parseInt(qualityRange.value),
       vibe: vibeScore,
       notes: $('notes-input').value.trim(),
       skipped: false
-    });
+    };
   } else {
-    results.push({ filename: files[current].name, skipped: true });
+    results[current] = { filename: files[current].name, skipped: true };
   }
+
+  drafts[current] = results[current];
 
   current++;
   if (current >= files.length) {
@@ -871,7 +978,8 @@ function showDone() {
   $('eval-screen').style.display = 'none';
   $('done-screen').style.display = 'flex';
 
-  const rated = results.filter(r => !r.skipped);
+  const finalized = results.filter(Boolean);
+  const rated = finalized.filter(r => !r.skipped);
   const passed = rated.filter(r => r.vibe === 'pass').length;
   const failed = rated.filter(r => r.vibe === 'fail').length;
   const avgFaith = rated.length ? (rated.reduce((s, r) => s + r.faithfulness, 0) / rated.length).toFixed(1) : '—';
@@ -884,7 +992,7 @@ function showDone() {
 
 $('download-btn').addEventListener('click', () => {
   const rows = [['filename','faithfulness','quality','vibe','notes','skipped']];
-  results.forEach(r => {
+  results.filter(Boolean).forEach(r => {
     rows.push([
       r.filename,
       r.skipped ? '' : r.faithfulness,
@@ -903,7 +1011,7 @@ $('download-btn').addEventListener('click', () => {
 });
 
 $('restart-btn').addEventListener('click', () => {
-  files = []; results = []; current = 0;
+  files = []; results = []; drafts = []; current = 0;
   fileInput.value = '';
   $('file-count').textContent = '';
   $('start-btn').disabled = true;

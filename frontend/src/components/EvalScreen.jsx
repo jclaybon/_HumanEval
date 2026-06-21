@@ -23,6 +23,8 @@ export default function EvalScreen({
   onMaskPointerUp,
   onMaskPointerCancel,
   onNotesChange,
+  canGoPreviousImage,
+  onPreviousImage,
   onBack,
   onNext,
   onClearMarks,
@@ -32,12 +34,13 @@ export default function EvalScreen({
   const hasNotes = reviewState.notes.trim().length > 0;
   const hasMarks = maskPathsCount > 0;
   const canAdvanceFailure = isMarking && hasMarks && hasNotes;
+  const canNavigateImages = imageReady && !isMarking;
 
   return (
     <div className="screen active" id="eval-screen">
       <div className="eval-header">
         <div className="eval-head-left">
-          <span className="eval-title">Invited to the cookout?</span>
+          <span className="eval-title">Invited to the cookout? 🍗 👀</span>
         </div>
         <div className="pill">{total ? `${currentIndex + 1} / ${total}` : "0 / 0"}</div>
       </div>
@@ -103,6 +106,18 @@ export default function EvalScreen({
       </div>
 
       <div className="swipe-panel">
+        {!isMarking ? (
+          <div className="desktop-nav-actions">
+            <button
+              className="desktop-nav-btn"
+              type="button"
+              disabled={!canGoPreviousImage || !canNavigateImages}
+              onClick={onPreviousImage}
+            >
+              ← Back
+            </button>
+          </div>
+        ) : null}
         <div className={`secondary-actions ${isMarking ? "active" : ""}`}>
           <button className="swipe-btn back" id="back-btn" type="button" onClick={onBack}>
             Back

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Invited to the cookout? 🍗</title>
+<title>Invited to the cookout? 🍗 👀</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -47,8 +47,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .swipe-hint{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);padding:.45rem .78rem;border-radius:999px;background:rgba(26,24,20,.72);color:#F7F5F0;font-size:.72rem;font-weight:500;letter-spacing:.03em;white-space:nowrap}
 
 .swipe-panel{padding:0 1.5rem 1rem;display:flex;flex-direction:column;gap:1rem}
+.desktop-nav-actions{display:grid;grid-template-columns:1fr;gap:.75rem}
+.desktop-nav-actions.hidden{display:none}
 .secondary-actions{display:none;grid-template-columns:1fr 1fr 1fr;gap:.75rem}
 .secondary-actions.active{display:grid}
+.desktop-nav-btn{padding:.96rem .8rem;border-radius:18px;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:transform .15s,opacity .15s,border-color .15s;border:1px solid var(--border-mid);background:rgba(255,255,255,.78);color:var(--text)}
+.desktop-nav-btn:active{transform:scale(.98)}
+.desktop-nav-btn:disabled{opacity:.35;cursor:not-allowed}
 .swipe-btn{padding:.96rem .8rem;border-radius:18px;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:500;cursor:pointer;transition:transform .15s,opacity .15s;border:1px solid transparent;background:var(--surface)}
 .swipe-btn:active{transform:scale(.98)}
 .swipe-btn.mark{border:1px solid var(--border-mid);color:var(--text)}
@@ -112,7 +117,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="screen" id="eval-screen">
   <div class="eval-header">
     <div class="eval-head-left">
-      <span class="eval-title">Invited to the cookout? 🍗</span>
+      <span class="eval-title">Invited to the cookout? 🍗 👀</span>
     </div>
     <div class="pill" id="progress-pill">1 / 1</div>
   </div>
@@ -134,6 +139,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   </div>
 
   <div class="swipe-panel">
+    <div class="desktop-nav-actions" id="desktop-nav-actions">
+      <button class="desktop-nav-btn" id="desktop-prev-image-btn" type="button">← Back</button>
+    </div>
     <div class="secondary-actions" id="followup-actions">
       <button class="swipe-btn back" id="back-btn" type="button">Back</button>
       <button class="swipe-btn next" id="next-btn" type="button">Next image</button>
@@ -188,6 +196,7 @@ const reviewState = { verdict: null, mask: 'clear' };
 let maskPaths = [];
 let activePath = null;
 let isDrawing = false;
+let imageReady = false;
 let swipeGesture = null;
 let swipeDelta = { x: 0, y: 0 };
 
@@ -266,11 +275,14 @@ function updateMaskUi() {
   const marking = reviewState.mask === 'mark';
   const hasNotes = $('notes-input').value.trim().length > 0;
   const hasMarks = maskPaths.length > 0;
+  const canGoPreviousImage = !marking && imageReady && current > 0;
   $('followup-actions').classList.toggle('active', marking);
+  $('desktop-nav-actions').classList.toggle('hidden', marking);
   document.querySelector('.notes-area').classList.toggle('active', marking);
   maskCanvas.classList.toggle('active', marking);
   $('notes-input').disabled = !marking;
   $('notes-input').required = marking;
+  $('desktop-prev-image-btn').disabled = !canGoPreviousImage;
   $('next-btn').disabled = !marking || !hasMarks || !hasNotes;
   $('back-btn').disabled = !marking;
   $('clear-mark-btn').disabled = !hasMarks;
@@ -447,6 +459,7 @@ function humanizeMask(value, count) {
 
 function loadImage(idx) {
   const img = images[idx];
+  imageReady = false;
   $('progress-pill').textContent = `${idx + 1} / ${images.length}`;
   $('notes-input').value = '';
   resetReviewState();
@@ -457,6 +470,7 @@ function loadImage(idx) {
   $('img-skeleton').style.display = 'block';
   const el = $('eval-img');
   el.onload = () => {
+    imageReady = true;
     $('img-skeleton').style.display = 'none';
     $('image-stage').style.display = 'inline-flex';
     resizeMaskCanvas();
@@ -464,6 +478,7 @@ function loadImage(idx) {
     resetSwipeCard(true);
   };
   el.onerror = () => {
+    imageReady = true;
     $('img-skeleton').style.display = 'none';
     $('image-stage').style.display = 'inline-flex';
     el.alt = '(preview unavailable)';
@@ -480,13 +495,28 @@ async function advance(skipped) {
     if (!maskPaths.length || !hasNotes) return;
   }
   const img = images[current];
-  results.push(buildImageResult(img, skipped));
-  current += 1;
-  if (current >= images.length) {
-    await finishEval();
-  } else {
+  results[current] = buildImageResult(img, skipped);
+  const nextIndex = current + 1;
+  if (nextIndex < images.length) {
+    current = nextIndex;
     loadImage(current);
+    return;
   }
+
+  const pendingIndex = results.findIndex(item => item === null);
+  if (pendingIndex === -1) {
+    await finishEval();
+    return;
+  }
+
+  current = pendingIndex;
+  loadImage(current);
+}
+
+function goToImage(index) {
+  if (index < 0 || index >= images.length) return;
+  current = index;
+  loadImage(current);
 }
 
 function returnToSwipeMode() {
@@ -501,7 +531,8 @@ function returnToSwipeMode() {
 }
 
 async function finishEval() {
-  const rated = results.filter(item => item.verdict !== 'skip');
+  const completedResults = results.filter(Boolean);
+  const rated = completedResults.filter(item => item.verdict !== 'skip');
   const likes = rated.filter(item => item.verdict === 'like' || item.verdict === 'super_like');
   const superLikes = rated.filter(item => item.verdict === 'super_like');
   const notLikes = rated.filter(item => item.verdict === 'not_like');
@@ -520,7 +551,7 @@ async function finishEval() {
       body: JSON.stringify({
         batch_name: batchLabel,
         image_dir: reviewFolder,
-        results
+        results: completedResults
       })
     });
     const payload = await response.json();
@@ -547,7 +578,7 @@ async function bootstrap() {
     $('empty-folder-path').textContent = reviewFolder;
 
     images = payload.images || [];
-    results = [];
+    results = images.map(() => null);
     current = 0;
 
     if (!images.length) {
@@ -568,6 +599,10 @@ async function bootstrap() {
 
 window.addEventListener('resize', resizeMaskCanvas);
 $('clear-mark-btn').addEventListener('click', clearMaskDrawing);
+$('desktop-prev-image-btn').addEventListener('click', () => {
+  if (!imageReady || reviewState.mask === 'mark') return;
+  goToImage(current - 1);
+});
 $('next-btn').addEventListener('click', () => advance(false));
 $('back-btn').addEventListener('click', returnToSwipeMode);
 $('notes-input').addEventListener('input', updateMaskUi);
