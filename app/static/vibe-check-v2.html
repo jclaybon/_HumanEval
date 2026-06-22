@@ -117,7 +117,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 <div class="screen" id="eval-screen">
   <div class="eval-header">
     <div class="eval-head-left">
-      <span class="eval-title">Invited to the cookout? 🍗 👀</span>
+      <span class="eval-title" id="eval-title">Invited to the cookout? 🍗 👀</span>
     </div>
     <div class="pill" id="progress-pill">1 / 1</div>
   </div>
@@ -163,10 +163,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
   <div class="done-mark">✓</div>
   <div>
     <h2>Batch complete.</h2>
-    <p id="done-copy">Results were saved locally.</p>
+    <p id="done-copy">Results were saved.</p>
   </div>
   <div class="stats-grid">
-    <div class="stat-card"><div class="sn" id="s-total">0</div><div class="sl">reviewed</div></div>
+    <div class="stat-card"><div class="sn" id="s-total">0</div><div class="sl">checks</div></div>
     <div class="stat-card good-card"><div class="sn" id="s-like">0</div><div class="sl">likes</div></div>
     <div class="stat-card good-card"><div class="sn" id="s-super">0</div><div class="sl">super likes</div></div>
     <div class="stat-card alert-card"><div class="sn" id="s-nope">0</div><div class="sl">not likes</div></div>
@@ -186,11 +186,28 @@ const show = id => {
 };
 
 let images = [];
+let tasks = [];
 let current = 0;
 let results = [];
 let batchLabel = '';
 let reviewFolder = '';
 let outputPath = '';
+const baseEvalTypes = ['prompt_faithfulness', 'style_faithfulness', 'overall_vibe_check'];
+const evalCopyByType = {
+  prompt_faithfulness: { title: 'Prompt faithful?' },
+  style_faithfulness: { title: 'Style faithful?' },
+  monk_skin_tone: { title: 'Monk skin tone right?' },
+  overall_vibe_check: { title: 'Invited to the cookout? 🍗 👀' }
+};
+
+function resolveApiBaseUrl() {
+  if (typeof window.__VIBE_CHECK_API_BASE_URL__ === 'string' && window.__VIBE_CHECK_API_BASE_URL__.trim()) {
+    return window.__VIBE_CHECK_API_BASE_URL__.trim().replace(/\/$/, '');
+  }
+  return '';
+}
+
+const apiBaseUrl = resolveApiBaseUrl();
 
 const reviewState = { verdict: null, mask: 'clear' };
 let maskPaths = [];
@@ -203,6 +220,48 @@ let swipeDelta = { x: 0, y: 0 };
 const imageStage = $('image-stage');
 const maskCanvas = $('mask-canvas');
 const maskCtx = maskCanvas.getContext('2d');
+
+function normalizeHasPerson(value) {
+  return value === 1 || value === '1' || value === true ? 1 : 0;
+}
+
+function shuffleItems(items) {
+  const nextItems = items.slice();
+  for (let index = nextItems.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [nextItems[index], nextItems[swapIndex]] = [nextItems[swapIndex], nextItems[index]];
+  }
+  return nextItems;
+}
+
+function buildEvalTasks(sourceImages) {
+  const nextTasks = sourceImages.flatMap(image => {
+    const imageTasks = baseEvalTypes.map(evalType => ({
+      id: `${image.id}:${evalType}`,
+      evalType,
+      image
+    }));
+    if (normalizeHasPerson(image.has_person)) {
+      imageTasks.push({
+        id: `${image.id}:monk_skin_tone`,
+        evalType: 'monk_skin_tone',
+        image
+      });
+    }
+    return imageTasks;
+  });
+  return shuffleItems(nextTasks);
+}
+
+function getEvalCopy(evalType) {
+  return evalCopyByType[evalType] || evalCopyByType.overall_vibe_check;
+}
+
+function shouldIgnoreKeyboardShortcut(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName);
+}
 
 function clearSwipeBadges() {
   $('swipe-nope').classList.remove('visible');
@@ -421,11 +480,12 @@ function cancelSwipe(event) {
   resetSwipeCard();
 }
 
-function buildImageResult(img, skipped) {
+function buildTaskResult(task, skipped) {
   if (skipped) {
     return {
-      id: img.id,
-      name: img.name,
+      id: task.image.id,
+      name: task.image.name,
+      eval_type: task.evalType,
       verdict: 'skip',
       failure_points: null,
       mask_binary: 'no',
@@ -436,8 +496,9 @@ function buildImageResult(img, skipped) {
   }
 
   return {
-    id: img.id,
-    name: img.name,
+    id: task.image.id,
+    name: task.image.name,
+    eval_type: task.evalType,
     verdict: reviewState.verdict,
     failure_points: maskPaths.length ? 'mark' : 'clear',
     mask_binary: maskPaths.length ? 'yes' : 'no',
@@ -458,9 +519,11 @@ function humanizeMask(value, count) {
 }
 
 function loadImage(idx) {
-  const img = images[idx];
+  const task = tasks[idx];
+  const img = task.image;
+  $('eval-title').textContent = getEvalCopy(task.evalType).title;
   imageReady = false;
-  $('progress-pill').textContent = `${idx + 1} / ${images.length}`;
+  $('progress-pill').textContent = `${idx + 1} / ${tasks.length}`;
   $('notes-input').value = '';
   resetReviewState();
   clearMaskDrawing();
@@ -494,10 +557,10 @@ async function advance(skipped) {
     const hasNotes = $('notes-input').value.trim().length > 0;
     if (!maskPaths.length || !hasNotes) return;
   }
-  const img = images[current];
-  results[current] = buildImageResult(img, skipped);
+  const task = tasks[current];
+  results[current] = buildTaskResult(task, skipped);
   const nextIndex = current + 1;
-  if (nextIndex < images.length) {
+  if (nextIndex < tasks.length) {
     current = nextIndex;
     loadImage(current);
     return;
@@ -514,7 +577,7 @@ async function advance(skipped) {
 }
 
 function goToImage(index) {
-  if (index < 0 || index >= images.length) return;
+  if (index < 0 || index >= tasks.length) return;
   current = index;
   loadImage(current);
 }
@@ -545,7 +608,7 @@ async function finishEval() {
   $('s-mask').textContent = markedIssues.length;
 
   try {
-    const response = await fetch('/api/save-results', {
+    const response = await fetch(`${apiBaseUrl}/api/save-results`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -557,7 +620,7 @@ async function finishEval() {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || 'Could not save results.');
     $('saved-path').textContent = payload.output_path;
-    $('done-copy').textContent = `Saved ${payload.reviewed_count} reviews locally.`;
+    $('done-copy').textContent = `Saved ${payload.reviewed_count} checks.`;
   } catch (error) {
     $('saved-path').textContent = 'Save failed';
     $('done-copy').textContent = error.message;
@@ -568,7 +631,7 @@ async function finishEval() {
 
 async function bootstrap() {
   try {
-    const response = await fetch('/api/bootstrap');
+    const response = await fetch(`${apiBaseUrl}/api/bootstrap`);
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || 'Could not load images.');
 
@@ -578,10 +641,11 @@ async function bootstrap() {
     $('empty-folder-path').textContent = reviewFolder;
 
     images = payload.images || [];
-    results = images.map(() => null);
+    tasks = buildEvalTasks(images);
+    results = tasks.map(() => null);
     current = 0;
 
-    if (!images.length) {
+    if (!tasks.length) {
       show('empty-screen');
       return;
     }
@@ -621,6 +685,30 @@ imageStage.addEventListener('pointerdown', beginSwipe);
 imageStage.addEventListener('pointermove', moveSwipe);
 imageStage.addEventListener('pointerup', endSwipe);
 imageStage.addEventListener('pointercancel', cancelSwipe);
+
+window.addEventListener('keydown', event => {
+  if (!$('eval-screen').classList.contains('active') || !imageReady) return;
+  if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (shouldIgnoreKeyboardShortcut(event.target)) return;
+  if (reviewState.mask === 'mark' || isDrawing || swipeGesture || reviewState.verdict) return;
+
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    beginFailureReview();
+    return;
+  }
+
+  if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    completeSwipeDecision('like');
+    return;
+  }
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    completeSwipeDecision('super_like');
+  }
+});
 
 bootstrap();
 </script>

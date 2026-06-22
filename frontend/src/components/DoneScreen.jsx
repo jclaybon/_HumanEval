@@ -9,7 +9,7 @@ export default function DoneScreen({ doneCopy, savedPath, stats }) {
       <div className="stats-grid">
         <div className="stat-card">
           <div className="sn">{stats.reviewedCount}</div>
-          <div className="sl">reviewed</div>
+          <div className="sl">checks</div>
         </div>
         <div className="stat-card good-card">
           <div className="sn">{stats.likes}</div>

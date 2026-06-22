@@ -135,6 +135,14 @@ def parse_args():
         action="store_true",
         help="Open the app in the default browser after the server starts.",
     )
+    parser.add_argument(
+        "--api-base-url",
+        default=env_value("VIBE_CHECK_API_BASE_URL", ""),
+        help=(
+            "Optional absolute API base URL for the frontend, such as the deployed "
+            "Cloudflare Worker. Leave empty to use the local server routes."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -202,6 +210,32 @@ def get_frontend_entry_path():
     return LEGACY_HTML_PATH
 
 
+def runtime_api_script(api_base_url):
+    normalized = api_base_url.strip().rstrip("/")
+    if not normalized:
+        return ""
+
+    escaped = json.dumps(normalized)
+    return (
+        "<script>"
+        f"window.__VIBE_CHECK_API_BASE_URL__ = {escaped};"
+        "</script>"
+    )
+
+
+def read_html_with_runtime_config(path, api_base_url):
+    html = path.read_text(encoding="utf-8")
+    script = runtime_api_script(api_base_url)
+    if not script:
+        return html.encode("utf-8")
+
+    if "</head>" in html:
+        html = html.replace("</head>", f"{script}</head>", 1)
+    else:
+        html = f"{script}{html}"
+    return html.encode("utf-8")
+
+
 def resolve_static_path(root_dir, request_path):
     candidate = (root_dir / request_path.lstrip("/")).resolve()
     root = root_dir.resolve()
@@ -213,16 +247,24 @@ def resolve_static_path(root_dir, request_path):
     return candidate
 
 
-def read_frontend_asset(request_path):
+def read_frontend_asset(request_path, api_base_url):
     if not FRONTEND_DIST_DIR.exists():
         return None
 
     asset_path = resolve_static_path(FRONTEND_DIST_DIR, request_path)
     if asset_path:
+        if asset_path.suffix.lower() == ".html":
+            return (
+                read_html_with_runtime_config(asset_path, api_base_url),
+                file_content_type(asset_path),
+            )
         return asset_path.read_bytes(), file_content_type(asset_path)
 
     if "." not in Path(request_path).name and FRONTEND_INDEX_PATH.exists():
-        return FRONTEND_INDEX_PATH.read_bytes(), "text/html; charset=utf-8"
+        return (
+            read_html_with_runtime_config(FRONTEND_INDEX_PATH, api_base_url),
+            "text/html; charset=utf-8",
+        )
 
     return None
 
@@ -524,12 +566,19 @@ def validate_results(payload):
         raise ValueError("results must be a list.")
 
     normalized = []
+    allowed_eval_types = {
+        "prompt_faithfulness",
+        "style_faithfulness",
+        "monk_skin_tone",
+        "overall_vibe_check",
+    }
     for item in results:
         if not isinstance(item, dict):
             raise ValueError("Each result entry must be an object.")
 
         item_id = item.get("id") or make_numeric_id(item.get("name", ""))
         name = item.get("name")
+        eval_type = item.get("eval_type", "overall_vibe_check")
         verdict = item.get("verdict")
         failure_points = item.get("failure_points")
         masked_areas = item.get("masked_areas", 0)
@@ -541,6 +590,8 @@ def validate_results(payload):
             raise ValueError("Each result must include a numeric id.")
         if not isinstance(name, str) or not name:
             raise ValueError("Each result must include a non-empty image name.")
+        if eval_type not in allowed_eval_types:
+            raise ValueError("eval_type must be a supported review category.")
         if verdict not in {"like", "super_like", "not_like", "skip"}:
             raise ValueError("verdict must be like, super_like, not_like, or skip.")
         if failure_points not in {None, "clear", "mark"}:
@@ -561,6 +612,7 @@ def validate_results(payload):
             {
                 "id": item_id,
                 "name": name,
+                "eval_type": eval_type,
                 "verdict": verdict,
                 "failure_points": failure_points,
                 "mask_binary": mask_binary,
@@ -603,7 +655,7 @@ def build_saved_payload(image_source, output_path, results):
     }
 
 
-def make_handler(image_source, output_path):
+def make_handler(image_source, output_path, api_base_url):
     class VibeCheckHandler(BaseHTTPRequestHandler):
         def _send_bytes(self, body, content_type, status=HTTPStatus.OK):
             self.send_response(status)
@@ -621,7 +673,10 @@ def make_handler(image_source, output_path):
 
             if parsed.path == "/":
                 self._send_bytes(
-                    get_frontend_entry_path().read_bytes(),
+                    read_html_with_runtime_config(
+                        get_frontend_entry_path(),
+                        api_base_url,
+                    ),
                     "text/html; charset=utf-8",
                 )
                 return
@@ -643,6 +698,7 @@ def make_handler(image_source, output_path):
                             "id": record.id,
                             "name": record.name,
                             "url": record.url,
+                            "has_person": 0,
                         }
                         for record in records
                     ],
@@ -675,7 +731,7 @@ def make_handler(image_source, output_path):
                 self._send_bytes(body, content_type)
                 return
 
-            frontend_asset = read_frontend_asset(parsed.path)
+            frontend_asset = read_frontend_asset(parsed.path, api_base_url)
             if frontend_asset:
                 body, content_type = frontend_asset
                 self._send_bytes(body, content_type)
@@ -740,7 +796,7 @@ def main():
     if not frontend_entry_path.exists():
         raise SystemExit(f"Frontend file not found: {frontend_entry_path}")
 
-    handler = make_handler(image_source, output_path)
+    handler = make_handler(image_source, output_path, args.api_base_url)
 
     with ThreadingHTTPServer((args.host, args.port), handler) as server:
         url = f"http://{args.host}:{server.server_address[1]}"

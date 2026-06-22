@@ -1,30 +1,13 @@
--- Drop existing table
-DROP TABLE IF EXISTS image_metadata;
+-- Rebuild eval_logs to support category-based task reviews while preserving data.
+-- Historical mappings:
+--   style_checker   -> overall_vibe_check
+--   prompt_faithful -> prompt_faithfulness
 
--- Model metadata: describes the model that generated the image
-CREATE TABLE IF NOT EXISTS model_metadata (
-  model_id TEXT PRIMARY KEY,
-  model_name TEXT NOT NULL,
-  model_trained_steps INTEGER,
-  created_at TEXT DEFAULT (datetime('now'))
-);
+PRAGMA foreign_keys = OFF;
 
--- Image metadata: describes the image
-CREATE TABLE IF NOT EXISTS image_metadata (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT,
-  created_from_prompt TEXT,
-  model_id TEXT REFERENCES model_metadata(model_id),
-  has_person INTEGER DEFAULT 0 CHECK(has_person IN (0, 1)),
-  style_name TEXT,
-  style_description_keyword TEXT,
-  r2_key TEXT NOT NULL,
-  created_at TEXT DEFAULT (datetime('now'))
-);
+DROP TABLE IF EXISTS eval_logs_next;
 
--- Eval logs: records the human eval (verdict, mask, notes)
-CREATE TABLE IF NOT EXISTS eval_logs (
+CREATE TABLE eval_logs_next (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   image_id TEXT NOT NULL REFERENCES image_metadata(id),
   eval_type TEXT NOT NULL CHECK(eval_type IN ('prompt_faithfulness', 'style_faithfulness', 'monk_skin_tone', 'overall_vibe_check')),
@@ -38,7 +21,40 @@ CREATE TABLE IF NOT EXISTS eval_logs (
   reviewed_at TEXT DEFAULT (datetime('now'))
 );
 
--- Keep only the latest review row per image + eval type + batch before enforcing upserts.
+INSERT INTO eval_logs_next (
+  id,
+  image_id,
+  eval_type,
+  verdict,
+  failure_points,
+  mask_binary,
+  masked_areas,
+  mask_data_url,
+  notes,
+  batch_name,
+  reviewed_at
+)
+SELECT
+  id,
+  image_id,
+  CASE
+    WHEN eval_type = 'style_checker' THEN 'overall_vibe_check'
+    WHEN eval_type = 'prompt_faithful' THEN 'prompt_faithfulness'
+    ELSE eval_type
+  END AS eval_type,
+  verdict,
+  failure_points,
+  mask_binary,
+  masked_areas,
+  mask_data_url,
+  notes,
+  batch_name,
+  reviewed_at
+FROM eval_logs;
+
+DROP TABLE eval_logs;
+ALTER TABLE eval_logs_next RENAME TO eval_logs;
+
 DELETE FROM eval_logs
 WHERE id IN (
   SELECT id
@@ -57,3 +73,5 @@ WHERE id IN (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_eval_logs_image_eval_batch
 ON eval_logs (image_id, eval_type, batch_name);
+
+PRAGMA foreign_keys = ON;

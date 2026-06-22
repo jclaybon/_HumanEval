@@ -42,6 +42,12 @@ If you have not built the React app yet, the server falls back to the legacy sta
 
 By default, review images now live in `data/review_images/`, and saved results go to `data/outputs/vibe_check_results.json`.
 
+If you want the local UI to read and write through the deployed Cloudflare Worker instead of the local Python API, start it like this:
+
+```bash
+VIBE_CHECK_API_BASE_URL=https://underscore-humaneval-worker.humaneval.workers.dev python3 vibe_check_server.py --open
+```
+
 ## React development
 
 Run the Python API in one terminal:
@@ -58,7 +64,34 @@ npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. Vite proxies `/api`, `/images`, and `/health` back to the Python server on port `8000`.
+Open `http://127.0.0.1:5173`. Vite proxies `/api`, `/images`, and `/health` to the configured Cloudflare Worker.
+
+## Pages deployment
+
+The production frontend build reads `VITE_API_BASE_URL` from [frontend/.env.production](/Users/act/Desktop/UnderscoreHumanEval/frontend/.env.production:1), which points the deployed Pages site at:
+
+```text
+https://underscore-humaneval-worker.humaneval.workers.dev
+```
+
+If you prefer managing that value in the Cloudflare Pages dashboard instead, set the same `VITE_API_BASE_URL` there and it will override the repo default at build time.
+
+## Worker-hosted app
+
+The Cloudflare Worker is also configured to serve the built React app directly from `frontend/dist`, while still handling:
+
+- `/api/*`
+- `/images/*`
+- `/health`
+
+That means after you build the frontend and deploy the Worker, opening your `workers.dev` URL should load the app itself, not just the API.
+
+```bash
+cd frontend
+npm run build
+cd ../worker
+wrangler deploy
+```
 
 ## Use Cloudflare R2
 

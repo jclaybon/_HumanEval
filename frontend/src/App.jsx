@@ -25,6 +25,27 @@ const defaultStageStyle = {
   opacity: 1
 };
 
+const baseEvalTypes = [
+  "prompt_faithfulness",
+  "style_faithfulness",
+  "overall_vibe_check"
+];
+
+const evalCopyByType = {
+  prompt_faithfulness: {
+    title: "Prompt faithful?"
+  },
+  style_faithfulness: {
+    title: "Style faithful?"
+  },
+  monk_skin_tone: {
+    title: "Monk skin tone right?"
+  },
+  overall_vibe_check: {
+    title: "Invited to the cookout? 🍗 👀"
+  }
+};
+
 function detectSwipeDecision(dx, dy) {
   if (-dy > 110 && Math.abs(dy) > Math.abs(dx) + 20) {
     return "super_like";
@@ -36,6 +57,78 @@ function detectSwipeDecision(dx, dy) {
     return "not_like";
   }
   return null;
+}
+
+function normalizeHasPerson(value) {
+  return value === 1 || value === "1" || value === true ? 1 : 0;
+}
+
+function resolveApiBaseUrl() {
+  const runtimeBaseUrl =
+    typeof globalThis.__VIBE_CHECK_API_BASE_URL__ === "string"
+      ? globalThis.__VIBE_CHECK_API_BASE_URL__.trim()
+      : "";
+
+  if (runtimeBaseUrl) {
+    return runtimeBaseUrl.replace(/\/$/, "");
+  }
+
+  const envBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+  if (envBaseUrl) {
+    return envBaseUrl.replace(/\/$/, "");
+  }
+
+  return "";
+}
+
+function shuffleItems(items) {
+  const nextItems = items.slice();
+
+  for (let index = nextItems.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [nextItems[index], nextItems[swapIndex]] = [nextItems[swapIndex], nextItems[index]];
+  }
+
+  return nextItems;
+}
+
+function buildEvalTasks(images) {
+  const tasks = images.flatMap((image) => {
+    const nextTasks = baseEvalTypes.map((evalType) => ({
+      id: `${image.id}:${evalType}`,
+      evalType,
+      image
+    }));
+
+    if (normalizeHasPerson(image.has_person)) {
+      nextTasks.push({
+        id: `${image.id}:monk_skin_tone`,
+        evalType: "monk_skin_tone",
+        image
+      });
+    }
+
+    return nextTasks;
+  });
+
+  return shuffleItems(tasks);
+}
+
+function getEvalCopy(evalType) {
+  return evalCopyByType[evalType] ?? evalCopyByType.overall_vibe_check;
+}
+
+function shouldIgnoreKeyboardShortcut(target) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  return ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName);
 }
 
 function computeSummary(results) {
@@ -57,11 +150,12 @@ function computeSummary(results) {
   };
 }
 
-function buildImageResult(image, reviewState, maskPaths, canvas, skipped) {
+function buildTaskResult(task, reviewState, maskPaths, canvas, skipped) {
   if (skipped) {
     return {
-      id: image.id,
-      name: image.name,
+      id: task.image.id,
+      name: task.image.name,
+      eval_type: task.evalType,
       verdict: "skip",
       failure_points: null,
       mask_binary: "no",
@@ -72,8 +166,9 @@ function buildImageResult(image, reviewState, maskPaths, canvas, skipped) {
   }
 
   return {
-    id: image.id,
-    name: image.name,
+    id: task.image.id,
+    name: task.image.name,
+    eval_type: task.evalType,
     verdict: reviewState.verdict,
     failure_points: maskPaths.length ? "mark" : "clear",
     mask_binary: maskPaths.length ? "yes" : "no",
@@ -85,10 +180,7 @@ function buildImageResult(image, reviewState, maskPaths, canvas, skipped) {
 
 function friendlyLoadMessage(error) {
   if (error instanceof Error && error.message === "Failed to fetch") {
-    return (
-      "Backend not reachable. Start the Python server with " +
-      "`python3 vibe_check_server.py` before opening the React frontend."
-    );
+    return "Review API not reachable. Start the local server or point the UI at the deployed worker.";
   }
   if (error instanceof Error && error.message) {
     return error.message;
@@ -97,6 +189,7 @@ function friendlyLoadMessage(error) {
 }
 
 export default function App() {
+  const apiBaseUrl = resolveApiBaseUrl();
   const [screen, setScreen] = useState("loading");
   const [loadingCopy, setLoadingCopy] = useState({
     title: "Loading images",
@@ -114,6 +207,7 @@ export default function App() {
     outputPath: ""
   });
   const [images, setImages] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState([]);
   const [reviewState, setReviewState] = useState(initialReviewState);
@@ -123,7 +217,7 @@ export default function App() {
   const [swipePreview, setSwipePreview] = useState(null);
   const [stageStyle, setStageStyle] = useState(defaultStageStyle);
   const [doneView, setDoneView] = useState({
-    doneCopy: "Results were saved locally.",
+    doneCopy: "Results were saved.",
     savedPath: "-",
     stats: emptyStats
   });
@@ -141,12 +235,15 @@ export default function App() {
 
   const batchInfoRef = useRef(batchInfo);
   const imagesRef = useRef(images);
+  const tasksRef = useRef(tasks);
   const currentIndexRef = useRef(currentIndex);
   const resultsRef = useRef(results);
   const reviewStateRef = useRef(reviewState);
   const maskPathsRef = useRef(maskPaths);
 
-  const currentImage = images[currentIndex] ?? null;
+  const currentTask = tasks[currentIndex] ?? null;
+  const currentImage = currentTask?.image ?? null;
+  const currentEvalCopy = getEvalCopy(currentTask?.evalType);
   const swipeHint = reviewState.maskMode
     ? "Circle failure points, add a note, then tap Next image"
     : "Left no, right like, up super like";
@@ -159,6 +256,11 @@ export default function App() {
   function setImagesValue(nextValue) {
     imagesRef.current = nextValue;
     setImages(nextValue);
+  }
+
+  function setTasksValue(nextValue) {
+    tasksRef.current = nextValue;
+    setTasks(nextValue);
   }
 
   function setCurrentIndexValue(nextValue) {
@@ -400,8 +502,8 @@ export default function App() {
   }
 
   async function advance(skipped) {
-    const image = imagesRef.current[currentIndexRef.current];
-    if (!image) {
+    const task = tasksRef.current[currentIndexRef.current];
+    if (!task) {
       return;
     }
 
@@ -412,8 +514,8 @@ export default function App() {
       }
     }
 
-    const nextResult = buildImageResult(
-      image,
+    const nextResult = buildTaskResult(
+      task,
       reviewStateRef.current,
       maskPathsRef.current,
       maskCanvasRef.current,
@@ -424,7 +526,7 @@ export default function App() {
     setResultsValue(nextResults);
 
     const nextIndex = currentIndexRef.current + 1;
-    if (nextIndex < imagesRef.current.length) {
+    if (nextIndex < tasksRef.current.length) {
       setCurrentIndexValue(nextIndex);
       return;
     }
@@ -454,12 +556,13 @@ export default function App() {
 
     window.clearTimeout(advanceTimerRef.current);
     advanceTimerRef.current = window.setTimeout(() => {
+      advanceTimerRef.current = null;
       advance(false);
     }, 220);
   }
 
   function goToImage(nextIndex) {
-    if (nextIndex < 0 || nextIndex >= imagesRef.current.length) {
+    if (nextIndex < 0 || nextIndex >= tasksRef.current.length) {
       return;
     }
 
@@ -527,12 +630,12 @@ export default function App() {
 
     setLoadingCopy({
       title: "Saving results",
-      description: "Writing this batch to disk."
+      description: "Saving this batch."
     });
     setScreen("saving");
 
     try {
-      const response = await fetch("https://underscore-humaneval-worker.humaneval.workers.dev/api/save-results", {
+      const response = await fetch(`${apiBaseUrl}/api/save-results`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -550,7 +653,7 @@ export default function App() {
       }
 
       setDoneView({
-        doneCopy: `Saved ${payload.reviewed_count} reviews locally.`,
+        doneCopy: `Saved ${payload.reviewed_count} checks.`,
         savedPath: payload.output_path,
         stats: {
           reviewedCount: payload.reviewed_count,
@@ -592,7 +695,7 @@ export default function App() {
   useEffect(() => {
     async function bootstrap() {
       try {
-        const response = await fetch("https://underscore-humaneval-worker.humaneval.workers.dev/api/bootstrap");
+        const response = await fetch(`${apiBaseUrl}/api/bootstrap`);
         const payload = await response.json();
 
         if (!response.ok) {
@@ -608,11 +711,14 @@ export default function App() {
 
         startTransition(() => {
           setBatchInfoValue(nextBatchInfo);
+          const nextTasks = buildEvalTasks(nextImages);
+
           setImagesValue(nextImages);
-          setResultsValue(nextImages.map(() => null));
+          setTasksValue(nextTasks);
+          setResultsValue(nextTasks.map(() => null));
           setCurrentIndexValue(0);
 
-          if (nextImages.length) {
+          if (nextTasks.length) {
             setScreen("home");
             return;
           }
@@ -659,7 +765,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (screen !== "eval" || !currentImage) {
+    if (screen !== "eval" || !currentTask) {
       return;
     }
 
@@ -673,7 +779,51 @@ export default function App() {
     setImageError(false);
     redrawMaskCanvas([], null);
     resetSwipeCard(true);
-  }, [screen, currentImage]);
+  }, [screen, currentTask]);
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (screen !== "eval" || !currentTask || !imageReady) {
+        return;
+      }
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+      if (shouldIgnoreKeyboardShortcut(event.target)) {
+        return;
+      }
+      if (
+        reviewStateRef.current.maskMode ||
+        isDrawingRef.current ||
+        swipeGestureRef.current ||
+        reviewStateRef.current.verdict
+      ) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        beginFailureReview();
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        completeSwipeDecision("like");
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        completeSwipeDecision("super_like");
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [screen, currentTask, imageReady]);
 
   if (screen === "loading" || screen === "saving") {
     return (
@@ -715,9 +865,10 @@ export default function App() {
 
   return (
     <EvalScreen
+      title={currentEvalCopy.title}
       image={currentImage}
       currentIndex={currentIndex}
-      total={images.length}
+      total={tasks.length}
       imageReady={imageReady}
       imageError={imageError}
       reviewState={reviewState}
@@ -739,8 +890,8 @@ export default function App() {
       onMaskPointerUp={endMaskStroke}
       onMaskPointerCancel={endMaskStroke}
       onNotesChange={handleNotesChange}
-      canGoPreviousImage={currentIndex > 0}
-      onPreviousImage={handlePreviousImage}
+      canGoPreviousTask={currentIndex > 0}
+      onPreviousTask={handlePreviousImage}
       onBack={returnToSwipeMode}
       onNext={() => advance(false)}
       onClearMarks={clearMaskDrawing}

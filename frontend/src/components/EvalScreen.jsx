@@ -1,4 +1,5 @@
 export default function EvalScreen({
+  title,
   image,
   currentIndex,
   total,
@@ -23,8 +24,8 @@ export default function EvalScreen({
   onMaskPointerUp,
   onMaskPointerCancel,
   onNotesChange,
-  canGoPreviousImage,
-  onPreviousImage,
+  canGoPreviousTask,
+  onPreviousTask,
   onBack,
   onNext,
   onClearMarks,
@@ -40,7 +41,7 @@ export default function EvalScreen({
     <div className="screen active" id="eval-screen">
       <div className="eval-header">
         <div className="eval-head-left">
-          <span className="eval-title">Invited to the cookout? 🍗 👀</span>
+          <span className="eval-title">{title}</span>
         </div>
         <div className="pill">{total ? `${currentIndex + 1} / ${total}` : "0 / 0"}</div>
       </div>
@@ -111,8 +112,8 @@ export default function EvalScreen({
             <button
               className="desktop-nav-btn"
               type="button"
-              disabled={!canGoPreviousImage || !canNavigateImages}
-              onClick={onPreviousImage}
+              disabled={!canGoPreviousTask || !canNavigateImages}
+              onClick={onPreviousTask}
             >
               ← Back
             </button>

@@ -1,4 +1,11 @@
 const SUPPORTED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+const ALLOWED_EVAL_TYPES = new Set([
+  "prompt_faithfulness",
+  "style_faithfulness",
+  "monk_skin_tone",
+  "overall_vibe_check"
+]);
+const ALLOWED_VERDICTS = new Set(["like", "super_like", "not_like", "skip"]);
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +30,33 @@ function extMimeType(name) {
   const ext = name.toLowerCase().split(".").pop();
   const map = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
   return map[ext] || "application/octet-stream";
+}
+
+function normalizeHasPerson(value) {
+  return value === 1 || value === "1" || value === true ? 1 : 0;
+}
+
+function normalizeEvalResult(result) {
+  const evalType = result.eval_type;
+  const verdict = result.verdict;
+
+  if (!ALLOWED_EVAL_TYPES.has(evalType)) {
+    throw new Error(`Invalid eval_type: ${evalType}`);
+  }
+  if (!ALLOWED_VERDICTS.has(verdict)) {
+    throw new Error(`Invalid verdict: ${verdict}`);
+  }
+
+  return {
+    ...result,
+    eval_type: evalType,
+    verdict,
+    failure_points: result.failure_points ?? null,
+    mask_binary: result.mask_binary ?? "no",
+    masked_areas: result.masked_areas ?? 0,
+    mask_data_url: result.mask_data_url ?? null,
+    notes: result.notes ?? ""
+  };
 }
 
 function json(data, status = 200) {
@@ -63,15 +97,46 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
+    if ((pathname === "/prd" || pathname === "/prd/") && env.ASSETS) {
+      const prdUrl = new URL("/prd/index.html", request.url);
+      return env.ASSETS.fetch(new Request(prdUrl, request));
+    }
+
     if (pathname === "/api/bootstrap" && request.method === "GET") {
       try {
-        const records = await listImages(env.R2_BUCKET);
+        const [records, metadataResult] = await Promise.all([
+          listImages(env.R2_BUCKET),
+          env.humaneval_db
+            .prepare(`
+              SELECT id, name, r2_key, COALESCE(has_person, 0) AS has_person
+              FROM image_metadata
+            `)
+            .all()
+            .catch(() => ({ results: [] }))
+        ]);
+        const metadataRows = metadataResult.results || [];
+        const metadataById = new Map(metadataRows.map((row) => [row.id, row]));
+        const metadataByName = new Map(metadataRows.map((row) => [row.name, row]));
+        const metadataByKey = new Map(metadataRows.map((row) => [row.r2_key, row]));
+
         return json({
           batch_name: "underscorehumaneval",
           image_dir: "r2://underscorehumaneval",
           source_type: "r2",
           output_path: "cloudflare-d1",
-          images: records.map(({ id, name, url }) => ({ id, name, url })),
+          images: records.map(({ id, key, name, url }) => {
+            const metadata =
+              metadataById.get(id) ||
+              metadataByKey.get(key) ||
+              metadataByName.get(name);
+
+            return {
+              id,
+              name,
+              url,
+              has_person: normalizeHasPerson(metadata?.has_person)
+            };
+          }),
         });
       } catch (err) {
         return json({ error: err.message }, 502);
@@ -93,7 +158,9 @@ export default {
     if (pathname === "/api/save-results" && request.method === "POST") {
       try {
         const body = await request.json();
-        const results = body.results || [];
+        const results = Array.isArray(body.results)
+          ? body.results.map(normalizeEvalResult)
+          : [];
         const batchName = body.batch_name || "underscorehumaneval";
         const reviewedAt = new Date().toISOString();
 
@@ -112,11 +179,19 @@ export default {
           env.humaneval_db.prepare(`
             INSERT INTO eval_logs
               (image_id, eval_type, verdict, failure_points, mask_binary, masked_areas, mask_data_url, notes, batch_name, reviewed_at)
-            VALUES (?, 'style_checker', ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(image_id, eval_type, batch_name) DO UPDATE SET
+              verdict = excluded.verdict,
+              failure_points = excluded.failure_points,
+              mask_binary = excluded.mask_binary,
+              masked_areas = excluded.masked_areas,
+              mask_data_url = excluded.mask_data_url,
+              notes = excluded.notes,
+              reviewed_at = excluded.reviewed_at
           `).bind(
-            r.id, r.verdict, r.failure_points ?? null,
-            r.mask_binary ?? "no", r.masked_areas ?? 0,
-            r.mask_data_url ?? null, r.notes ?? "",
+            r.id, r.eval_type, r.verdict, r.failure_points,
+            r.mask_binary, r.masked_areas,
+            r.mask_data_url, r.notes,
             batchName, reviewedAt
           ),
         ]);

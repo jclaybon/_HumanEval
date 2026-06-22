@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Underscore Human Eval — PRD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --app-bg: #f7f5f0;
+    --app-surface: #ffffff;
+    --app-text: #1a1814;
+    --app-muted: #8c8880;
+    --app-border: rgba(26,24,20,0.10);
+    --app-border-mid: rgba(26,24,20,0.22);
+    --app-good: #2d6a4f;
+    --app-bad: #c1440e;
+    --ink: #111010;
+    --ink-soft: #3d3b38;
+    --rule: #e2ddd6;
+    --accent: #1a1814;
+  }
+
+  html { font-size: 16px; }
+
+  body {
+    font-family: "DM Sans", sans-serif;
+    color: var(--ink);
+    background: #faf9f6;
+    line-height: 1.65;
+  }
+
+  /* ─── COVER ─────────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 6rem 6rem 5rem;
+    background: radial-gradient(circle at top right, rgba(214,173,111,0.16), transparent 50%),
+                radial-gradient(circle at bottom left, rgba(45,106,79,0.10), transparent 45%),
+                #f7f5f0;
+    page-break-after: always;
+  }
+
+  .cover-eyebrow {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--app-muted);
+    margin-bottom: 1.6rem;
+  }
+
+  .cover h1 {
+    font-family: "DM Serif Display", serif;
+    font-size: clamp(2.8rem, 6vw, 5rem);
+    line-height: 1.0;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+  }
+
+  .cover h2 {
+    font-family: "DM Serif Display", serif;
+    font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+    font-weight: 400;
+    font-style: italic;
+    color: var(--app-muted);
+    margin-bottom: 2.8rem;
+  }
+
+  .cover-meta {
+    display: flex;
+    gap: 3rem;
+    font-size: 0.84rem;
+    color: var(--app-muted);
+  }
+
+  .cover-meta strong {
+    display: block;
+    font-size: 0.69rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.2rem;
+  }
+
+  .cover-rule {
+    width: 64px;
+    height: 3px;
+    background: var(--ink);
+    border-radius: 2px;
+    margin: 2rem 0 3rem;
+  }
+
+  /* ─── LAYOUT ─────────────────────────────────── */
+  .page {
+    max-width: 840px;
+    margin: 0 auto;
+    padding: 5rem 5rem;
+  }
+
+  @media (max-width: 700px) {
+    .page { padding: 3rem 1.8rem; }
+    .cover { padding: 3rem 2rem; }
+  }
+
+  /* ─── SECTION HEADINGS ────────────────────────── */
+  .section {
+    margin-bottom: 4rem;
+    page-break-inside: avoid;
+  }
+
+  .section-label {
+    font-size: 0.69rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--app-muted);
+    margin-bottom: 0.6rem;
+  }
+
+  h2.section-title {
+    font-family: "DM Serif Display", serif;
+    font-size: 2rem;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    margin-bottom: 1.2rem;
+    line-height: 1.1;
+  }
+
+  h3.sub-title {
+    font-family: "DM Serif Display", serif;
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 1.6rem 0 0.5rem;
+  }
+
+  hr.section-rule {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin-bottom: 2rem;
+  }
+
+  p { margin-bottom: 0.8rem; font-size: 0.95rem; color: var(--ink-soft); }
+
+  ul, ol {
+    padding-left: 1.4rem;
+    margin-bottom: 0.8rem;
+  }
+
+  li { font-size: 0.95rem; color: var(--ink-soft); margin-bottom: 0.3rem; }
+
+  /* ─── CALLOUT BOXES ───────────────────────────── */
+  .callout {
+    background: rgba(255,255,255,0.82);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    padding: 1.25rem 1.4rem;
+    margin: 1rem 0;
+    backdrop-filter: blur(6px);
+  }
+
+  .callout-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--app-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .callout p { margin: 0; }
+
+  /* ─── CHIP ROW ────────────────────────────────── */
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.8rem 0;
+  }
+
+  .chip {
+    display: inline-block;
+    padding: 0.28rem 0.72rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    background: rgba(26,24,20,0.06);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+  }
+
+  .chip.good { background: rgba(45,106,79,0.10); color: var(--app-good); border-color: rgba(45,106,79,0.2); }
+  .chip.bad  { background: rgba(193,68,14,0.10);  color: var(--app-bad);  border-color: rgba(193,68,14,0.2); }
+
+  /* ─── TABLE ───────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin: 1rem 0;
+  }
+
+  th {
+    text-align: left;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--app-muted);
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  td {
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid rgba(226,221,214,0.55);
+    color: var(--ink-soft);
+    vertical-align: top;
+  }
+
+  td code, th code {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.82rem;
+    background: rgba(26,24,20,0.05);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    color: var(--ink);
+  }
+
+  /* ─── FLOW DIAGRAM ────────────────────────────── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 1.2rem 0;
+  }
+
+  .flow-step {
+    background: rgba(255,255,255,0.9);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 0.6rem 1.0rem;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  .flow-arrow {
+    color: var(--app-muted);
+    font-size: 1.1rem;
+    padding: 0 0.4rem;
+  }
+
+  /* ─── ARCHITECTURE DIAGRAM ────────────────────── */
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.9rem;
+    margin: 1.2rem 0;
+  }
+
+  .arch-card {
+    background: rgba(255,255,255,0.88);
+    border: 1px solid var(--rule);
+    border-radius: 16px;
+    padding: 1.1rem;
+  }
+
+  .arch-card-icon {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .arch-card-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    margin-bottom: 0.3rem;
+  }
+
+  .arch-card-desc {
+    font-size: 0.76rem;
+    color: var(--app-muted);
+    line-height: 1.5;
+  }
+
+  /* ─── PHONE MOCKUP WRAPPER ────────────────────── */
+  .screens-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    margin: 2rem 0;
+    align-items: start;
+  }
+
+  .screen-figure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .screen-caption {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--app-muted);
+    text-align: center;
+  }
+
+  /* Phone shell */
+  .phone-shell {
+    width: 100%;
+    max-width: 190px;
+    background: #1a1814;
+    border-radius: 28px;
+    padding: 10px;
+    box-shadow: 0 24px 48px rgba(26,24,20,0.25), 0 0 0 1px rgba(255,255,255,0.06);
+    position: relative;
+  }
+
+  .phone-screen {
+    border-radius: 20px;
+    overflow: hidden;
+    background: radial-gradient(circle at top, #fffcf6 0%, #f7f5f0 42%, #efe8dd 100%);
+    position: relative;
+  }
+
+  /* ─── MOCK: HOME ──────────────────────────────── */
+  .mock-home {
+    padding: 14px 12px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mock-hero {
+    width: 100%;
+    border-radius: 16px;
+    border: 1px solid rgba(26,24,20,0.08);
+    background:
+      radial-gradient(circle at top left, rgba(214,173,111,0.22), transparent 40%),
+      radial-gradient(circle at bottom right, rgba(45,106,79,0.12), transparent 40%),
+      linear-gradient(145deg, rgba(255,255,255,0.94), rgba(244,238,229,0.96));
+    padding: 12px 10px 10px;
+    text-align: center;
+    box-shadow: 0 10px 22px rgba(26,24,20,0.08);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mock-orb-l {
+    position: absolute; width: 48px; height: 48px;
+    left: -12px; top: -14px;
+    background: rgba(214,173,111,0.22);
+    border-radius: 999px; filter: blur(4px);
+  }
+
+  .mock-orb-r {
+    position: absolute; width: 56px; height: 56px;
+    right: -16px; bottom: -20px;
+    background: rgba(45,106,79,0.10);
+    border-radius: 999px; filter: blur(4px);
+  }
+
+  .mock-logo-card {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.88);
+    border: 1px solid rgba(26,24,20,0.07);
+    box-shadow: 0 6px 14px rgba(26,24,20,0.08);
+    margin-bottom: 6px;
+  }
+
+  .mock-logo-inner {
+    width: 80px;
+    display: block;
+  }
+
+  .mock-kicker {
+    font-size: 4px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(26,24,20,0.6);
+    display: block;
+    position: relative;
+  }
+
+  .mock-h1 {
+    font-family: "DM Serif Display", serif;
+    font-size: 18px;
+    letter-spacing: -0.04em;
+    line-height: 0.98;
+    color: #1a1814;
+    position: relative;
+  }
+
+  .mock-start-btn {
+    display: inline-block;
+    padding: 7px 24px;
+    border-radius: 999px;
+    background: #1a1814;
+    color: #f7f5f0;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+    box-shadow: 0 8px 18px rgba(26,24,20,0.14);
+  }
+
+  /* ─── MOCK: EVAL ──────────────────────────────── */
+  .mock-eval {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mock-eval-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 5px;
+  }
+
+  .mock-eval-title {
+    font-family: "DM Serif Display", serif;
+    font-size: 10px;
+    letter-spacing: -0.02em;
+    color: #1a1814;
+  }
+
+  .mock-pill {
+    background: rgba(26,24,20,0.07);
+    border-radius: 99px;
+    padding: 2px 6px;
+    font-size: 6px;
+    font-weight: 500;
+    color: #8c8880;
+  }
+
+  .mock-image-wrap {
+    padding: 0 8px 6px;
+  }
+
+  .mock-image-card {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    background: rgba(26,24,20,0.05);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 22px rgba(26,24,20,0.08);
+    overflow: hidden;
+  }
+
+  .mock-image-placeholder {
+    width: 80%;
+    height: 80%;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #e8e2d9 0%, #d4cec5 50%, #cac3b8 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: rgba(26,24,20,0.25);
+  }
+
+  .mock-like-badge {
+    position: absolute;
+    top: 8px; right: 8px;
+    padding: 2px 5px;
+    border: 1.5px solid var(--app-good);
+    border-radius: 999px;
+    background: rgba(247,245,240,0.92);
+    font-size: 5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--app-good);
+  }
+
+  .mock-nope-badge {
+    position: absolute;
+    top: 8px; left: 8px;
+    padding: 2px 5px;
+    border: 1.5px solid var(--app-bad);
+    border-radius: 999px;
+    background: rgba(247,245,240,0.92);
+    font-size: 5px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--app-bad);
+  }
+
+  .mock-hint {
+    position: absolute;
+    bottom: 8px;
+    left: 50%; transform: translateX(-50%);
+    padding: 3px 6px;
+    border-radius: 999px;
+    background: rgba(26,24,20,0.72);
+    color: #f7f5f0;
+    font-size: 4.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .mock-btn-row {
+    padding: 5px 8px 3px;
+    display: flex;
+    justify-content: flex-start;
+  }
+
+  .mock-back-btn {
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(26,24,20,0.22);
+    background: rgba(255,255,255,0.78);
+    font-size: 6px;
+    font-weight: 600;
+    color: #1a1814;
+  }
+
+  .mock-skip {
+    text-align: center;
+    font-size: 5px;
+    color: #8c8880;
+    padding-bottom: 8px;
+  }
+
+  /* ─── MOCK: MARK MODE ─────────────────────────── */
+  .mock-mark-canvas-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .mock-mark-canvas-overlay svg {
+    width: 100%; height: 100%;
+  }
+
+  .mock-mark-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 5px;
+    padding: 5px 8px;
+  }
+
+  .mock-mark-btn {
+    padding: 5px 4px;
+    border-radius: 8px;
+    font-size: 5.5px;
+    font-weight: 500;
+    text-align: center;
+    border: 1px solid rgba(26,24,20,0.22);
+    background: var(--app-surface);
+    color: #1a1814;
+  }
+
+  .mock-mark-btn.next-btn {
+    background: #1a1814;
+    border-color: #1a1814;
+    color: #f7f5f0;
+  }
+
+  .mock-notes {
+    padding: 0 8px 8px;
+  }
+
+  .mock-notes-label {
+    font-size: 4.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8c8880;
+    margin-bottom: 3px;
+  }
+
+  .mock-notes-box {
+    width: 100%;
+    background: rgba(255,255,255,0.82);
+    border: 1px solid rgba(26,24,20,0.22);
+    border-radius: 6px;
+    height: 22px;
+    padding: 4px 5px;
+    font-size: 4.5px;
+    color: #8c8880;
+  }
+
+  /* ─── MOCK: DONE ──────────────────────────────── */
+  .mock-done {
+    padding: 18px 12px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .mock-ok-mark {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: rgba(45,106,79,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--app-good);
+  }
+
+  .mock-done-h2 {
+    font-family: "DM Serif Display", serif;
+    font-size: 14px;
+    letter-spacing: -0.02em;
+    color: #1a1814;
+  }
+
+  .mock-done-p {
+    font-size: 6px;
+    color: #8c8880;
+  }
+
+  .mock-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    width: 100%;
+  }
+
+  .mock-stat {
+    background: rgba(255,255,255,0.82);
+    border-radius: 8px;
+    padding: 6px;
+    border: 1px solid rgba(26,24,20,0.1);
+    text-align: left;
+  }
+
+  .mock-stat .sn {
+    font-family: "DM Serif Display", serif;
+    font-size: 14px;
+    color: #1a1814;
+    line-height: 1;
+  }
+
+  .mock-stat .sl {
+    font-size: 5px;
+    color: #8c8880;
+    margin-top: 1px;
+  }
+
+  .mock-stat.good .sn { color: var(--app-good); }
+  .mock-stat.bad  .sn { color: var(--app-bad); }
+
+  .mock-info-card {
+    width: 100%;
+    background: rgba(255,255,255,0.82);
+    border-radius: 8px;
+    border: 1px solid rgba(26,24,20,0.10);
+    padding: 6px;
+    text-align: left;
+  }
+
+  .mock-info-label {
+    font-size: 4.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8c8880;
+    margin-bottom: 3px;
+  }
+
+  .mock-info-code {
+    display: block;
+    background: rgba(26,24,20,0.04);
+    border-radius: 5px;
+    padding: 4px 5px;
+    font-family: monospace;
+    font-size: 4px;
+    color: #1a1814;
+    overflow-wrap: anywhere;
+  }
+
+  /* ─── EVAL TYPE CARDS ────────────────────────── */
+  .eval-types-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+    margin: 1rem 0;
+  }
+
+  .eval-type-card {
+    background: rgba(255,255,255,0.88);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+  }
+
+  .eval-type-key {
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.72rem;
+    color: var(--app-muted);
+    margin-bottom: 0.3rem;
+  }
+
+  .eval-type-title {
+    font-family: "DM Serif Display", serif;
+    font-size: 1rem;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+  }
+
+  .eval-type-desc {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+
+  /* ─── VERDICT PILLS ──────────────────────────── */
+  .verdict-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.7rem;
+    margin: 1rem 0;
+  }
+
+  .verdict-card {
+    background: rgba(255,255,255,0.88);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 0.9rem 0.9rem 0.75rem;
+    text-align: center;
+  }
+
+  .verdict-symbol {
+    font-size: 1.4rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .verdict-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 0.15rem;
+  }
+
+  .verdict-key {
+    font-family: monospace;
+    font-size: 0.65rem;
+    color: var(--app-muted);
+  }
+
+  /* ─── ENDPOINT TABLE ─────────────────────────── */
+  .endpoint-row td:first-child code {
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  /* ─── SQL BLOCK ──────────────────────────────── */
+  pre {
+    background: rgba(26,24,20,0.04);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 1.1rem 1.2rem;
+    overflow-x: auto;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: 0.78rem;
+    line-height: 1.65;
+    color: var(--ink-soft);
+    margin: 1rem 0;
+  }
+
+  /* ─── PRINT ──────────────────────────────────── */
+  @media print {
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    body { background: #fff; }
+
+    .cover {
+      min-height: 100vh;
+      padding: 5rem 5rem;
+      background: #f7f5f0 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page { padding: 3rem 5rem; }
+
+    .section { page-break-inside: avoid; }
+
+    .screens-grid { page-break-inside: avoid; }
+
+    pre { page-break-inside: avoid; }
+
+    .phone-shell,
+    .arch-card,
+    .callout,
+    .eval-type-card,
+    .verdict-card,
+    .mock-stat,
+    .mock-info-card {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════ COVER ══ -->
+<div class="cover">
+  <div class="cover-eyebrow">Product Requirements Document</div>
+  <h1>Underscore<br>Human Eval</h1>
+  <h2>Vibe Check Tool</h2>
+  <div class="cover-rule"></div>
+  <div class="cover-meta">
+    <div>
+      <strong>Project</strong>
+      _HumanEval
+    </div>
+    <div>
+      <strong>Team</strong>
+      Underscore Animation
+    </div>
+    <div>
+      <strong>Date</strong>
+      June 2026
+    </div>
+    <div>
+      <strong>Status</strong>
+      Active Development
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ BODY ══ -->
+<div class="page">
+
+  <!-- 1. OVERVIEW -->
+  <div class="section">
+    <div class="section-label">01 — Overview</div>
+    <h2 class="section-title">What is this?</h2>
+    <hr class="section-rule" />
+    <p>
+      <strong>Underscore Human Eval</strong> is an internal quality-review tool built by Underscore Animation for rapidly evaluating AI-generated images. Reviewers use a swipe-based mobile interface to rate images across four structured evaluation dimensions, flag specific failure areas with freehand drawing, and add written notes. Results are persisted to a JSON file locally or to a Cloudflare D1 database in the cloud.
+    </p>
+    <p>
+      The product is nicknamed <em>Vibe Check</em> internally — reflecting its goal of fast, opinionated, gut-level human judgment on AI image quality at scale.
+    </p>
+    <div class="callout">
+      <div class="callout-label">Core insight</div>
+      <p>AI image generation produces large batches that need rapid, consistent human review across multiple quality axes. A Tinder-style swipe UX lets reviewers work through hundreds of images quickly without form-filling fatigue.</p>
+    </div>
+  </div>
+
+  <!-- 2. PROBLEM -->
+  <div class="section">
+    <div class="section-label">02 — Problem Statement</div>
+    <h2 class="section-title">The problem we're solving</h2>
+    <hr class="section-rule" />
+    <p>Underscore Animation generates AI imagery at volume — scenes, characters, and styled outputs from diffusion models fine-tuned on specific aesthetics. Before these assets reach production, human reviewers must evaluate:</p>
+    <ul>
+      <li>Whether the image faithfully followed the original prompt</li>
+      <li>Whether the image maintains the intended visual style</li>
+      <li>Whether skin tones (when a person is present) are accurate to the Monk Skin Tone reference</li>
+      <li>An overall subjective quality check ("cookout invited?")</li>
+    </ul>
+    <p>
+      Without a dedicated tool, this review happens in file browsers, spreadsheets, or ad-hoc chat — inconsistent, unstructured, and impossible to aggregate into training signal. Human Eval replaces that chaos with a purpose-built, structured review pipeline.
+    </p>
+  </div>
+
+  <!-- 3. GOALS -->
+  <div class="section">
+    <div class="section-label">03 — Goals &amp; Non-Goals</div>
+    <h2 class="section-title">What we're building (and what we're not)</h2>
+    <hr class="section-rule" />
+
+    <h3 class="sub-title">Goals</h3>
+    <ul>
+      <li>Provide a fast, mobile-friendly swipe interface for human reviewers to evaluate batches of AI images</li>
+      <li>Support four structured evaluation types per image</li>
+      <li>Allow reviewers to circle/mark specific failure areas directly on the image using touch or pointer input</li>
+      <li>Capture free-text notes alongside verdict and mark data</li>
+      <li>Persist results both locally (JSON) and in the cloud (Cloudflare D1 / R2)</li>
+      <li>Support local image folders and Cloudflare R2 buckets as image sources interchangeably</li>
+      <li>Deploy to Cloudflare Workers for zero-infrastructure cloud operation</li>
+    </ul>
+
+    <h3 class="sub-title">Non-Goals</h3>
+    <ul>
+      <li>Not a public-facing product — internal use only</li>
+      <li>Not a model training harness — evaluation data is an output, not a direct training pipeline</li>
+      <li>Not a real-time collaboration tool — one reviewer per batch session</li>
+      <li>Not a general-purpose image annotation platform</li>
+    </ul>
+  </div>
+
+  <!-- 4. USERS -->
+  <div class="section">
+    <div class="section-label">04 — Target Users</div>
+    <h2 class="section-title">Who uses this?</h2>
+    <hr class="section-rule" />
+    <p>
+      <strong>Primary user:</strong> Internal team members at Underscore Animation — art directors, animators, and prompt engineers — who are responsible for quality-gating AI-generated images before use in production.
+    </p>
+    <p>
+      <strong>Persona:</strong> A reviewer who understands Underscore Animation's visual style, can recognize prompt faithfulness, and is familiar with the Monk Skin Tone scale. They are working through a batch of dozens to hundreds of images in a focused review session, likely on a phone or tablet.
+    </p>
+    <div class="chip-row">
+      <span class="chip">Art Directors</span>
+      <span class="chip">Prompt Engineers</span>
+      <span class="chip">Animators</span>
+      <span class="chip">Internal QA</span>
+    </div>
+  </div>
+
+  <!-- 5. SCREENS -->
+  <div class="section">
+    <div class="section-label">05 — App Screens</div>
+    <h2 class="section-title">The four key states</h2>
+    <hr class="section-rule" />
+
+    <div class="screens-grid">
+
+      <!-- HOME SCREEN -->
+      <div class="screen-figure">
+        <div class="phone-shell">
+          <div class="phone-screen">
+            <div class="mock-home">
+              <div class="mock-hero">
+                <div class="mock-orb-l"></div>
+                <div class="mock-orb-r"></div>
+                <div class="mock-logo-card">
+                  <img class="mock-logo-inner" src="data:image/png;base64,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" alt="Underscore Animation" />
+                </div>
+                <div style="position:relative; margin-top:6px;">
+                  <span class="mock-kicker">Underscore Animation</span>
+                  <div class="mock-h1">Human Eval</div>
+                </div>
+              </div>
+              <div class="mock-start-btn">start</div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-caption">Home Screen</div>
+      </div>
+
+      <!-- EVAL SCREEN -->
+      <div class="screen-figure">
+        <div class="phone-shell">
+          <div class="phone-screen">
+            <div class="mock-eval">
+              <div class="mock-eval-header">
+                <span class="mock-eval-title">Invited to the cookout? 🍗</span>
+                <span class="mock-pill">3 / 24</span>
+              </div>
+              <div class="mock-image-wrap">
+                <div class="mock-image-card">
+                  <div class="mock-image-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  </div>
+                  <div class="mock-like-badge">Like</div>
+                  <div class="mock-hint">Left no · right like · up super like</div>
+                </div>
+              </div>
+              <div class="mock-btn-row">
+                <div class="mock-back-btn">← Back</div>
+              </div>
+              <div class="mock-skip">Skip this image</div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-caption">Eval · Swipe Mode</div>
+      </div>
+
+      <!-- MARK MODE -->
+      <div class="screen-figure">
+        <div class="phone-shell">
+          <div class="phone-screen">
+            <div class="mock-eval">
+              <div class="mock-eval-header">
+                <span class="mock-eval-title">Style faithful?</span>
+                <span class="mock-pill">7 / 24</span>
+              </div>
+              <div class="mock-image-wrap">
+                <div class="mock-image-card">
+                  <div class="mock-image-placeholder">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  </div>
+                  <div class="mock-mark-canvas-overlay">
+                    <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M40,55 C44,48 52,42 60,50 C68,58 60,70 52,65 C44,60 42,52 46,47" fill="none" stroke="rgba(193,68,14,0.95)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M90,80 C96,74 106,72 110,82 C114,92 106,100 98,96" fill="none" stroke="rgba(193,68,14,0.95)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div class="mock-mark-actions">
+                <div class="mock-mark-btn">Back</div>
+                <div class="mock-mark-btn next-btn">Next image</div>
+                <div class="mock-mark-btn">Clear marks</div>
+              </div>
+              <div class="mock-notes">
+                <div class="mock-notes-label">Why is this an issue?</div>
+                <div class="mock-notes-box">Wrong colour palette in bg…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-caption">Eval · Mark Mode</div>
+      </div>
+
+      <!-- DONE SCREEN -->
+      <div class="screen-figure">
+        <div class="phone-shell">
+          <div class="phone-screen">
+            <div class="mock-done">
+              <div class="mock-ok-mark">OK</div>
+              <div>
+                <div class="mock-done-h2">Batch complete.</div>
+                <div class="mock-done-p" style="margin-top:3px;">Saved 36 checks.</div>
+              </div>
+              <div class="mock-stats">
+                <div class="mock-stat"><div class="sn">36</div><div class="sl">checks</div></div>
+                <div class="mock-stat good"><div class="sn">21</div><div class="sl">likes</div></div>
+                <div class="mock-stat good"><div class="sn">8</div><div class="sl">super likes</div></div>
+                <div class="mock-stat bad"><div class="sn">7</div><div class="sl">not likes</div></div>
+                <div class="mock-stat bad"><div class="sn">4</div><div class="sl">marked issues</div></div>
+              </div>
+              <div class="mock-info-card">
+                <div class="mock-info-label">Saved to</div>
+                <div class="mock-info-code">data/outputs/vibe_check_results.json</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-caption">Done Screen</div>
+      </div>
+
+    </div><!-- /.screens-grid -->
+  </div>
+
+  <!-- 6. USER FLOW -->
+  <div class="section">
+    <div class="section-label">06 — User Flow</div>
+    <h2 class="section-title">End-to-end reviewer journey</h2>
+    <hr class="section-rule" />
+    <div class="flow">
+      <div class="flow-step">Loading</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Home</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Eval (swipe)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Not Like?</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Mark mode</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Next image</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">Done</div>
+    </div>
+    <ol>
+      <li><strong>Loading</strong> — App fetches the image batch from <code>/api/bootstrap</code>. Displays a loading state while waiting.</li>
+      <li><strong>Home</strong> — Branded splash with the Underscore Animation logo. Reviewer taps <em>start</em> to begin the batch.</li>
+      <li><strong>Eval — Swipe Mode</strong> — Each task shows an image and asks a specific evaluation question. The reviewer swipes right (Like), left (Nope), or up (Super Like). They can also tap <em>Skip</em> to skip the current task or <em>← Back</em> to revisit the previous one.</li>
+      <li><strong>Swipe Left triggers Mark Mode</strong> — When a reviewer swipes left (Not Like), the app enters Mark Mode. The image stays visible and a crosshair cursor activates, letting the reviewer draw freehand circles on the problem area.</li>
+      <li><strong>Mark Mode</strong> — Reviewer draws on the image to indicate the failure point, writes a note explaining the issue, then taps <em>Next image</em> to proceed. Both a drawing and a note are required to advance.</li>
+      <li><strong>Done</strong> — After all tasks are reviewed, results are posted to <code>/api/save-results</code> and the Done screen shows a summary: total checks, likes, super likes, not likes, and marked issues.</li>
+    </ol>
+  </div>
+
+  <!-- 7. EVAL TYPES -->
+  <div class="section">
+    <div class="section-label">07 — Evaluation Dimensions</div>
+    <h2 class="section-title">Four ways to judge an image</h2>
+    <hr class="section-rule" />
+    <p>Each image is evaluated across multiple dimensions. Evaluation tasks are shuffled to reduce ordering bias. If an image is tagged <code>has_person = 1</code>, a Monk Skin Tone task is added automatically.</p>
+    <div class="eval-types-grid">
+      <div class="eval-type-card">
+        <div class="eval-type-key">prompt_faithfulness</div>
+        <div class="eval-type-title">Prompt faithful?</div>
+        <div class="eval-type-desc">Does the image match what was asked for in the generation prompt? Checks subject, composition, and described elements.</div>
+      </div>
+      <div class="eval-type-card">
+        <div class="eval-type-key">style_faithfulness</div>
+        <div class="eval-type-title">Style faithful?</div>
+        <div class="eval-type-desc">Does the image maintain Underscore Animation's intended visual style? Checks palette, rendering quality, and aesthetic consistency.</div>
+      </div>
+      <div class="eval-type-card">
+        <div class="eval-type-key">monk_skin_tone</div>
+        <div class="eval-type-title">Monk skin tone right?</div>
+        <div class="eval-type-desc">Only shown for images flagged <code>has_person=1</code>. Is the skin tone rendered accurately per the Monk Skin Tone Scale reference?</div>
+      </div>
+      <div class="eval-type-card">
+        <div class="eval-type-key">overall_vibe_check</div>
+        <div class="eval-type-title">Invited to the cookout? 🍗</div>
+        <div class="eval-type-desc">A holistic gut-check: does this image pass muster overall? The catch-all quality signal.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. VERDICTS -->
+  <div class="section">
+    <div class="section-label">08 — Verdict System</div>
+    <h2 class="section-title">How reviewers rate images</h2>
+    <hr class="section-rule" />
+    <div class="verdict-row">
+      <div class="verdict-card">
+        <div class="verdict-symbol">👆</div>
+        <span class="verdict-name">Super Like</span>
+        <span class="verdict-key">super_like</span>
+      </div>
+      <div class="verdict-card">
+        <div class="verdict-symbol">👉</div>
+        <span class="verdict-name">Like</span>
+        <span class="verdict-key">like</span>
+      </div>
+      <div class="verdict-card">
+        <div class="verdict-symbol">👈</div>
+        <span class="verdict-name">Not Like</span>
+        <span class="verdict-key">not_like</span>
+      </div>
+      <div class="verdict-card">
+        <div class="verdict-symbol">⏭</div>
+        <span class="verdict-name">Skip</span>
+        <span class="verdict-key">skip</span>
+      </div>
+    </div>
+    <p>Swipe <strong>right</strong> = Like · Swipe <strong>left</strong> = Not Like (triggers Mark Mode) · Swipe <strong>up</strong> = Super Like · Tap <strong>Skip</strong> = pass without rating.</p>
+    <p>When <code>not_like</code> is selected, the reviewer must draw at least one mark on the image <em>and</em> write a note before the task can advance. This enforces structured failure documentation.</p>
+  </div>
+
+  <!-- 9. FEATURES -->
+  <div class="section">
+    <div class="section-label">09 — Feature Details</div>
+    <h2 class="section-title">Key capabilities</h2>
+    <hr class="section-rule" />
+
+    <h3 class="sub-title">Swipe Gestures</h3>
+    <p>Touch and pointer events drive swipe detection. A horizontal delta &gt; 95px registers Like or Not Like; an upward delta &gt; 110px registers Super Like. The card animates with rotation and opacity on drag, and snaps into a final exit position before advancing.</p>
+
+    <h3 class="sub-title">Canvas Mark Drawing</h3>
+    <p>When mark mode activates, an HTML5 Canvas element is overlaid on the image. The reviewer draws freehand paths with any pointer device (finger, stylus, mouse). Completed paths are stored as arrays of <code>{x, y}</code> coordinates and are also serialized as a PNG data URL saved with the result record.</p>
+
+    <h3 class="sub-title">Dual Image Sources</h3>
+    <table>
+      <thead>
+        <tr><th>Mode</th><th>Source</th><th>How to activate</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Local</strong></td><td>Folder on disk (<code>data/review_images/</code>)</td><td>Default — no config needed</td></tr>
+        <tr><td><strong>R2</strong></td><td>Cloudflare R2 bucket</td><td><code>--source=r2</code> + R2 env vars</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Task Shuffling</h3>
+    <p>Evaluation tasks are randomised each session using Fisher-Yates shuffle, preventing ordering bias from affecting results over time.</p>
+
+    <h3 class="sub-title">Batch Persistence</h3>
+    <p>On session completion, all results are POSTed to <code>/api/save-results</code>. The response includes a full summary (reviewed count, likes, super likes, not likes, marked issues) and the local path where the JSON was written.</p>
+
+    <h3 class="sub-title">Deployable to Cloudflare Workers</h3>
+    <p>The <code>worker/</code> directory contains a Cloudflare Worker implementation (<code>index.js</code>) that mirrors the Python server's API surface, backed by Cloudflare R2 (image storage) and D1 (SQLite database). The frontend can be pointed at either the local Python server or the deployed Worker via the <code>VIBE_CHECK_API_BASE_URL</code> environment variable.</p>
+  </div>
+
+  <!-- 10. API -->
+  <div class="section">
+    <div class="section-label">10 — API Contracts</div>
+    <h2 class="section-title">HTTP endpoints</h2>
+    <hr class="section-rule" />
+    <p>Both the local Python server and the Cloudflare Worker implement the same API surface.</p>
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      </thead>
+      <tbody class="endpoint-row">
+        <tr>
+          <td><code>GET</code></td>
+          <td><code>/api/bootstrap</code></td>
+          <td>Returns batch metadata and the full list of images (id, name, url, has_person). Called once on app load.</td>
+        </tr>
+        <tr>
+          <td><code>POST</code></td>
+          <td><code>/api/save-results</code></td>
+          <td>Accepts all eval results at the end of a session. Validates and writes to JSON (local) or D1 (cloud). Returns summary stats.</td>
+        </tr>
+        <tr>
+          <td><code>GET</code></td>
+          <td><code>/images/:key</code></td>
+          <td>Proxies image bytes from the configured source (local disk or R2) to the browser.</td>
+        </tr>
+        <tr>
+          <td><code>GET</code></td>
+          <td><code>/health</code></td>
+          <td>Liveness check. Returns <code>{"ok": true}</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="sub-title">Result payload shape</h3>
+    <pre>{
+  "id": "000012345678",        // 12-digit numeric image ID
+  "name": "image_001.png",    // filename
+  "eval_type": "overall_vibe_check",
+  "verdict": "not_like",      // like | super_like | not_like | skip
+  "failure_points": "mark",   // clear | mark | null
+  "mask_binary": "yes",       // yes | no
+  "masked_areas": 2,          // count of drawn strokes
+  "mask_data_url": "data:image/png;base64,...",
+  "notes": "Wrong background colour palette."
+}</pre>
+  </div>
+
+  <!-- 11. DATA MODEL -->
+  <div class="section">
+    <div class="section-label">11 — Data Model</div>
+    <h2 class="section-title">Cloud database schema (D1)</h2>
+    <hr class="section-rule" />
+    <p>The Cloudflare D1 (SQLite) schema defines three tables. A unique index on <code>(image_id, eval_type, batch_name)</code> prevents duplicate evaluations within a batch.</p>
+    <pre>model_metadata      — Fine-tuned model registry (model_id, name, training steps)
+
+image_metadata      — Per-image records (prompt, model, has_person flag, style,
+                      R2 object key)
+
+eval_logs           — One row per evaluation task result; foreign-keyed to
+                      image_metadata; stores verdict, failure_points,
+                      mask_binary, masked_areas, mask_data_url, notes,
+                      batch_name, reviewed_at</pre>
+
+    <p>Locally, results are written as a flat JSON file at <code>data/outputs/vibe_check_results.json</code>:</p>
+    <pre>{
+  "app": "vibe_check",
+  "saved_at": "2026-06-21T14:23:00",
+  "batch_name": "review_images",
+  "source_type": "local",
+  "reviewed_count": 36,
+  "likes": 21,
+  "super_likes": 8,
+  "not_likes": 7,
+  "marked_issues": 4,
+  "results": [ ... ]
+}</pre>
+  </div>
+
+  <!-- 12. ARCHITECTURE -->
+  <div class="section">
+    <div class="section-label">12 — Architecture</div>
+    <h2 class="section-title">How it's built</h2>
+    <hr class="section-rule" />
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="arch-card-icon">⚛️</div>
+        <div class="arch-card-title">React Frontend</div>
+        <div class="arch-card-desc">Built with Vite. Five screens managed by a single App.jsx state machine. No routing library — pure screen state. Swipe logic is pointer-event-native, no drag library.</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-icon">🐍</div>
+        <div class="arch-card-title">Python Local Server</div>
+        <div class="arch-card-desc">Zero-dependency stdlib HTTP server (<code>ThreadingHTTPServer</code>). Serves the React build, proxies local images, reads/writes results JSON. No Flask, no FastAPI.</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-icon">☁️</div>
+        <div class="arch-card-title">Cloudflare Worker</div>
+        <div class="arch-card-desc">JavaScript Worker mirrors the Python API. Reads images from R2, stores eval results in D1 (SQLite). Deployed globally via <code>wrangler</code>.</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-icon">🗂️</div>
+        <div class="arch-card-title">Cloudflare R2</div>
+        <div class="arch-card-desc">S3-compatible object storage. Signed with AWS4 HMAC-SHA256 in the Python server; accessed natively in the Worker. Stores image files.</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-icon">🗄️</div>
+        <div class="arch-card-title">Cloudflare D1</div>
+        <div class="arch-card-desc">Edge-global SQLite database. Stores model metadata, image metadata, and all eval logs. Unique constraint prevents duplicate reviews.</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-icon">📄</div>
+        <div class="arch-card-title">Local JSON Output</div>
+        <div class="arch-card-desc">When running locally, results are written to <code>data/outputs/vibe_check_results.json</code>. Includes full summary stats and all individual result records.</div>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:1.4rem;">
+      <div class="callout-label">Deployment flexibility</div>
+      <p>The frontend talks to whichever API is configured via <code>VIBE_CHECK_API_BASE_URL</code>. Point it at <code>http://127.0.0.1:8000</code> for local review, or at <code>https://underscore-humaneval-worker.humaneval.workers.dev</code> for the deployed cloud worker — no code changes needed.</p>
+    </div>
+  </div>
+
+  <!-- 13. RUNNING -->
+  <div class="section">
+    <div class="section-label">13 — Running the App</div>
+    <h2 class="section-title">Quick start</h2>
+    <hr class="section-rule" />
+
+    <h3 class="sub-title">Production (React build + Python server)</h3>
+    <pre>cd frontend && npm install && npm run build && cd ..
+python3 vibe_check_server.py --open</pre>
+
+    <h3 class="sub-title">Development (hot-reload)</h3>
+    <pre># Terminal 1 — Python API
+python3 vibe_check_server.py
+
+# Terminal 2 — React dev server (proxies /api to Python)
+cd frontend && npm run dev
+# → open http://127.0.0.1:5173</pre>
+
+    <h3 class="sub-title">Cloud (Cloudflare R2 source)</h3>
+    <pre>VIBE_CHECK_API_BASE_URL=https://underscore-humaneval-worker.humaneval.workers.dev \
+python3 vibe_check_server.py --open</pre>
+
+    <h3 class="sub-title">Environment variables</h3>
+    <table>
+      <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>VIBE_CHECK_SOURCE</code></td><td><code>local</code></td><td>Image source: <code>local</code> or <code>r2</code></td></tr>
+        <tr><td><code>VIBE_CHECK_IMAGE_DIR</code></td><td><code>data/review_images</code></td><td>Local image folder path</td></tr>
+        <tr><td><code>VIBE_CHECK_OUTPUT</code></td><td><code>data/outputs/vibe_check_results.json</code></td><td>Result file path</td></tr>
+        <tr><td><code>VIBE_CHECK_API_BASE_URL</code></td><td>(empty = local server)</td><td>Override API base URL</td></tr>
+        <tr><td><code>R2_ACCOUNT_ID</code></td><td>—</td><td>Cloudflare account ID</td></tr>
+        <tr><td><code>R2_BUCKET</code></td><td>—</td><td>R2 bucket name</td></tr>
+        <tr><td><code>R2_ACCESS_KEY_ID</code></td><td>—</td><td>R2 S3-compatible key</td></tr>
+        <tr><td><code>R2_SECRET_ACCESS_KEY</code></td><td>—</td><td>R2 secret</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 14. OPEN WORK -->
+  <div class="section">
+    <div class="section-label">14 — Open Items</div>
+    <h2 class="section-title">Potential next steps</h2>
+    <hr class="section-rule" />
+    <ul>
+      <li>Multi-reviewer support — allow multiple reviewers to rate the same batch and aggregate results</li>
+      <li>Reviewer identity tracking — associate eval records with a reviewer ID/name for inter-annotator agreement metrics</li>
+      <li>Progress persistence — save partial progress so a session can be resumed after closing the browser</li>
+      <li>Batch filtering — allow reviewers to filter by eval type, model, or style before starting a session</li>
+      <li>Export to CSV — produce a flat CSV alongside the JSON for easier spreadsheet analysis</li>
+      <li>Training signal pipeline — automated push of eval_logs to a model fine-tuning data store</li>
+      <li>Admin dashboard — view aggregate stats across batches and models</li>
+    </ul>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="border-top: 1px solid var(--rule); padding-top: 2rem; margin-top: 2rem; display:flex; justify-content:space-between; align-items:center;">
+    <div style="font-size:0.78rem; color:var(--app-muted);">
+      Underscore Animation — <em>Human Eval PRD</em>
+    </div>
+    <div style="font-size:0.78rem; color:var(--app-muted);">
+      June 2026 · Confidential
+    </div>
+  </div>
+
+</div><!-- /.page -->
+</body>
+</html>
