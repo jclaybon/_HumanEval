@@ -222,6 +222,56 @@ export default {
       }
     }
 
+    if (pathname === "/api/leaderboard" && request.method === "GET") {
+      try {
+        const batchName = url.searchParams.get("batch") || "underscorehumaneval";
+        const result = await env.humaneval_db
+          .prepare(`
+            SELECT
+              COALESCE(reviewer_name, 'Anonymous') as reviewer_name,
+              eval_type,
+              SUM(CASE WHEN verdict IN ('like', 'super_like') THEN 1 ELSE 0 END) as approvals,
+              SUM(CASE WHEN verdict = 'super_like' THEN 1 ELSE 0 END) as super_likes,
+              SUM(CASE WHEN verdict != 'skip' THEN 1 ELSE 0 END) as total_rated
+            FROM eval_logs
+            WHERE batch_name = ?
+            GROUP BY reviewer_name, eval_type
+          `)
+          .bind(batchName)
+          .all();
+
+        const byReviewer = {};
+        for (const row of result.results) {
+          const name = row.reviewer_name;
+          if (!byReviewer[name]) {
+            byReviewer[name] = { name, style: null, prompt: null, skin_tone: null, cookout: 0 };
+          }
+          const r = byReviewer[name];
+          if (!row.total_rated) continue;
+          const pct = Math.round((row.approvals / row.total_rated) * 100);
+          if (row.eval_type === "style_faithfulness") r.style = pct;
+          else if (row.eval_type === "prompt_faithfulness") r.prompt = pct;
+          else if (row.eval_type === "monk_skin_tone") r.skin_tone = pct;
+          else if (row.eval_type === "overall_vibe_check") r.cookout = row.super_likes;
+        }
+
+        const reviewers = Object.values(byReviewer).map((r) => {
+          const scored = [r.style, r.prompt, r.skin_tone].filter((v) => v !== null);
+          const score = scored.length
+            ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length)
+            : 0;
+          return { ...r, score };
+        });
+
+        reviewers.sort((a, b) => b.score - a.score);
+        reviewers.forEach((r, i) => { r.rank = i + 1; });
+
+        return json({ batch_name: batchName, reviewers });
+      } catch (err) {
+        return json({ error: err.message }, 502);
+      }
+    }
+
     if (pathname === "/health") {
       return json({ ok: true });
     }
