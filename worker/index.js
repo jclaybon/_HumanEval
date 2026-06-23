@@ -108,7 +108,8 @@ export default {
           listImages(env.R2_BUCKET),
           env.humaneval_db
             .prepare(`
-              SELECT id, name, r2_key, COALESCE(has_person, 0) AS has_person
+              SELECT id, name, r2_key, COALESCE(has_person, 0) AS has_person,
+                     created_from_prompt, style_name, style_description_keyword
               FROM image_metadata
             `)
             .all()
@@ -134,7 +135,10 @@ export default {
               id,
               name,
               url,
-              has_person: normalizeHasPerson(metadata?.has_person)
+              has_person: normalizeHasPerson(metadata?.has_person),
+              created_from_prompt: metadata?.created_from_prompt ?? null,
+              style_name: metadata?.style_name ?? null,
+              style_description_keyword: metadata?.style_description_keyword ?? null,
             };
           }),
         });
@@ -162,6 +166,7 @@ export default {
           ? body.results.map(normalizeEvalResult)
           : [];
         const batchName = body.batch_name || "underscorehumaneval";
+        const reviewerName = body.reviewer_name || null;
         const reviewedAt = new Date().toISOString();
 
         const rated = results.filter((r) => r.verdict !== "skip");
@@ -178,9 +183,9 @@ export default {
           `).bind(r.id, r.name, r.name),
           env.humaneval_db.prepare(`
             INSERT INTO eval_logs
-              (image_id, eval_type, verdict, failure_points, mask_binary, masked_areas, mask_data_url, notes, batch_name, reviewed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(image_id, eval_type, batch_name) DO UPDATE SET
+              (image_id, eval_type, verdict, failure_points, mask_binary, masked_areas, mask_data_url, notes, batch_name, reviewer_name, reviewed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(image_id, eval_type, batch_name, reviewer_name) DO UPDATE SET
               verdict = excluded.verdict,
               failure_points = excluded.failure_points,
               mask_binary = excluded.mask_binary,
@@ -192,7 +197,7 @@ export default {
             r.id, r.eval_type, r.verdict, r.failure_points,
             r.mask_binary, r.masked_areas,
             r.mask_data_url, r.notes,
-            batchName, reviewedAt
+            batchName, reviewerName, reviewedAt
           ),
         ]);
 
