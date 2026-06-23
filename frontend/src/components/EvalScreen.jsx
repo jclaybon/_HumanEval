@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function EvalScreen({
   title,
@@ -11,7 +11,6 @@ export default function EvalScreen({
   reviewState,
   maskPathsCount,
   swipePreview,
-  swipeHint,
   stageStyle,
   imageStageRef,
   imageRef,
@@ -35,14 +34,56 @@ export default function EvalScreen({
   onSkip
 }) {
   const [chipOpen, setChipOpen] = useState(false);
+  const [tutorialHint, setTutorialHint] = useState(null);
+  const imageCardRef = useRef(null);
+  const tutorialTimersRef = useRef([]);
+
   const isMarking = reviewState.maskMode;
   const hasNotes = reviewState.notes.trim().length > 0;
   const hasMarks = maskPathsCount > 0;
   const canAdvanceFailure = isMarking && hasMarks && hasNotes;
   const canNavigateImages = imageReady && !isMarking;
 
+  const progressPct = total ? Math.round(((currentIndex + 1) / total) * 100) : 0;
+  const isTutorial = currentIndex === 0 && imageReady;
+
+  useEffect(() => {
+    if (!isTutorial) return;
+    const card = imageCardRef.current;
+    if (!card) return;
+
+    tutorialTimersRef.current.forEach(clearTimeout);
+    tutorialTimersRef.current = [];
+
+    card.style.transition = "transform 0.55s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.4s ease";
+    card.style.overflow = "visible";
+
+    function at(ms, fn) {
+      tutorialTimersRef.current.push(setTimeout(fn, ms));
+    }
+
+    at(800,  () => { card.style.transform = "scale(1.035)"; card.style.boxShadow = "0 24px 52px rgba(124,58,237,0.28)"; });
+    at(1200, () => { card.style.transform = "none"; card.style.boxShadow = ""; });
+    at(1700, () => { setTutorialHint("left");  card.style.transform = "translateX(-72px) rotate(-9deg)"; card.style.boxShadow = "0 16px 40px rgba(220,38,38,0.5),0 0 0 3px rgba(220,38,38,0.3)"; });
+    at(2450, () => { setTutorialHint(null);   card.style.transform = "none"; card.style.boxShadow = ""; });
+    at(3000, () => { setTutorialHint("right"); card.style.transform = "translateX(72px) rotate(9deg)";  card.style.boxShadow = "0 16px 40px rgba(22,163,74,0.5),0 0 0 3px rgba(22,163,74,0.3)"; });
+    at(3750, () => { setTutorialHint(null);   card.style.transform = "none"; card.style.boxShadow = ""; });
+    at(4300, () => { setTutorialHint("up");   card.style.transform = "translateY(-75px)"; card.style.boxShadow = "0 16px 40px rgba(217,119,6,0.5),0 0 0 3px rgba(217,119,6,0.3)"; });
+    at(5050, () => { setTutorialHint(null);   card.style.transform = "none"; card.style.boxShadow = ""; });
+    at(5600, () => { card.style.transition = ""; card.style.overflow = ""; });
+
+    return () => {
+      tutorialTimersRef.current.forEach(clearTimeout);
+      if (card) { card.style.transform = ""; card.style.boxShadow = ""; card.style.transition = ""; card.style.overflow = ""; }
+      setTutorialHint(null);
+    };
+  }, [isTutorial]);
+
   return (
     <div className="screen active" id="eval-screen">
+      <div className="eval-progress-bar">
+        <div className="eval-progress-fill" style={{ width: `${progressPct}%` }} />
+      </div>
       <div className="eval-header">
         <div className="eval-head-left">
           <span className="eval-title">{title}</span>
@@ -51,7 +92,7 @@ export default function EvalScreen({
       </div>
 
       <div className="image-wrap">
-        <div className="image-card">
+        <div className="image-card" ref={imageCardRef}>
           {!imageReady ? <div className="skeleton" /> : null}
           <div
             className="image-stage"
@@ -104,11 +145,21 @@ export default function EvalScreen({
               >
                 Super
               </div>
-              <div className="swipe-hint">{swipeHint}</div>
             </div>
           </div>
+          {tutorialHint === "left"  && <div key="th-left"  className="tutorial-hint tutorial-hint-left">← Nope</div>}
+          {tutorialHint === "right" && <div key="th-right" className="tutorial-hint tutorial-hint-right">Like →</div>}
+          {tutorialHint === "up"    && <div key="th-up"    className="tutorial-hint tutorial-hint-up">↑ Super</div>}
         </div>
       </div>
+
+      {!isMarking ? (
+        <div className="swipe-legend">
+          <span className="swipe-legend-item"><span className="swipe-legend-arrow">←</span> No</span>
+          <span className="swipe-legend-item"><span className="swipe-legend-arrow">↑</span> Super like</span>
+          <span className="swipe-legend-item"><span className="swipe-legend-arrow">→</span> Like</span>
+        </div>
+      ) : null}
 
       {contextChip ? (
         <div className="context-chip-wrap">

@@ -1,7 +1,15 @@
 import { useState } from "react";
 import logoSrc from "../assets/underscore-animation-logo.png";
+import sammySrc from "../assets/sammy-startup-removebg-preview.png";
 
-export default function HomeScreen({ onStart }) {
+const THEMES = [
+  { id: "light", label: "LIGHT", dot: "#9896a4" },
+  { id: "dark",  label: "DARK",  dot: "#1e1b4b" },
+  { id: "fun",   label: "FUN",   dot: "#7C3AED" },
+  { id: "focus", label: "FOCUS", dot: "#111111" },
+];
+
+export default function HomeScreen({ onStart, theme, onThemeChange }) {
   const [name, setName] = useState("");
   const trimmed = name.trim();
 
@@ -23,6 +31,20 @@ export default function HomeScreen({ onStart }) {
         </div>
       </div>
 
+      <div className="theme-picker">
+        {THEMES.map((t) => (
+          <button
+            key={t.id}
+            className={`theme-picker-btn ${theme === t.id ? "active" : ""}`}
+            type="button"
+            onClick={() => onThemeChange(t.id)}
+          >
+            <span className="theme-dot" style={{ background: t.dot }} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <input
         className="home-name-input"
         type="text"
@@ -41,6 +63,10 @@ export default function HomeScreen({ onStart }) {
       >
         start
       </button>
+
+      <div className="sammy-peek" aria-hidden="true">
+        <img src={sammySrc} alt="" />
+      </div>
     </div>
   );
 }

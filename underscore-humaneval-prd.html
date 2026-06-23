@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -858,7 +858,7 @@
     </div>
     <div>
       <strong>Status</strong>
-      Active Development
+      Active · v2 Shipped
     </div>
   </div>
 </div>
@@ -1370,6 +1370,93 @@ python3 vibe_check_server.py --open</pre>
       <li>Training signal pipeline — automated push of eval_logs to a model fine-tuning data store</li>
       <li>Admin dashboard — view aggregate stats across batches and models</li>
     </ul>
+  </div>
+
+  <!-- 15. UX HIGHLIGHTS -->
+  <div class="section">
+    <div class="section-label">15 — UX Highlights</div>
+    <h2 class="section-title">Opportunities to improve reviewer experience</h2>
+    <hr class="section-rule" />
+
+    <h3 class="sub-title">Task Clarity</h3>
+    <p>The eval title (e.g. "Prompt faithful?") communicates what to judge but not what a positive or negative verdict means in context. Adding a one-liner below the title — e.g. <em>"Does the image match what was prompted?"</em> — would reduce reviewer ambiguity, especially for first-time users.</p>
+
+    <h3 class="sub-title">Progress Feedback</h3>
+    <p>The current <code>3 / 30</code> pill gives a count but limited momentum. A thin progress bar across the top of the eval screen would give a stronger visceral sense of completion and help reviewers pace themselves across longer sessions.</p>
+
+    <h3 class="sub-title">Not-Like Flow Friction</h3>
+    <p>A left swipe currently requires both a canvas annotation and a written note before the reviewer can advance. This is intentionally high-signal but high-friction. A lighter path — e.g. "flag without marking" — could improve completion rates while still capturing the negative verdict.</p>
+
+    <h3 class="sub-title">Task Grouping</h3>
+    <p>Tasks are currently shuffled randomly across all images and eval types. Grouping by image — evaluating all aspects of one image before moving to the next — may feel more natural since the reviewer is already in context. Worth A/B testing against the shuffled approach.</p>
+
+    <h3 class="sub-title">Swipe Legend</h3>
+    <p>The legend (← No · ↑ Super like · → Like) sits below the image in text form. Replacing the text arrows with small colored directional indicators would make the legend faster to scan at a glance.</p>
+
+    <h3 class="sub-title">Session Recovery</h3>
+    <p>If a reviewer closes the tab mid-session, all progress is lost and they restart from the beginning. Persisting partial results to <code>localStorage</code> keyed by reviewer name + batch would allow seamless resumption without requiring a server round-trip.</p>
+
+    <h3 class="sub-title">Done Screen Dead End</h3>
+    <p>The done screen currently has no path to start a new session or re-review. Adding a restart button (same reviewer, new shuffle) or a switch-reviewer option would improve usability in multi-person eval sessions.</p>
+  </div>
+
+  <!-- 16. SHIPPED — JUNE 2026 -->
+  <div class="section">
+    <div class="section-label">16 — Shipped Features · June 2026</div>
+    <h2 class="section-title">What we built this sprint</h2>
+    <hr class="section-rule" />
+    <p>These features were designed, built, and deployed to production (<code>underscore-humaneval-worker.humaneval.workers.dev</code>) in the June 2026 sprint.</p>
+
+    <h3 class="sub-title">Sammy Startup mascot peek — Home Screen</h3>
+    <p>
+      <strong>Sammy Startup</strong> is the flagship character from Underscore Animation's show of the same name. A transparent PNG cutout of Sammy's head and lightbulb (<code>sammy-startup-removebg-preview.png</code>) is now fixed to the bottom of the home screen, peeking up as if emerging from below the fold.
+    </p>
+    <ul>
+      <li>Asset: transparent PNG produced via remove.bg from the original JPG, cropped to head + lightbulb only</li>
+      <li>Positioned <code>fixed</code> at the horizontal center, anchored <code>bottom: -20px</code> so the character appears to peek in</li>
+      <li>Sized responsively: <code>min(300px, 75vw)</code> — large enough to read on mobile without crowding the UI</li>
+      <li>Animated with a continuous 3.8s <code>sammy-float</code> keyframe — gently bobs ±10px on the Y axis, <code>ease-in-out infinite</code></li>
+      <li><code>pointer-events: none</code> and <code>aria-hidden="true"</code> — purely decorative, doesn't block interaction</li>
+    </ul>
+
+    <h3 class="sub-title">Swipe gesture tutorial — First eval image</h3>
+    <p>
+      When a reviewer lands on the first image of any session (<code>currentIndex === 0 &amp;&amp; imageReady</code>), an automatic animation plays to demonstrate the three swipe gestures — no text instructions needed.
+    </p>
+    <p>The sequence (JS-driven via <code>useEffect</code> + <code>setTimeout</code>, imperative DOM manipulation on <code>imageCardRef</code>):</p>
+    <ol>
+      <li><strong>0.8s</strong> — card pulses with a subtle purple scale + glow (attention grab)</li>
+      <li><strong>1.7s</strong> — card slides left 72px, rotates −9°, red box-shadow, "← Nope" badge pops in</li>
+      <li><strong>2.45s</strong> — card snaps back, badge disappears</li>
+      <li><strong>3.0s</strong> — card slides right 72px, rotates +9°, green box-shadow, "Like →" badge pops in</li>
+      <li><strong>3.75s</strong> — card snaps back, badge disappears</li>
+      <li><strong>4.3s</strong> — card floats up 75px, amber box-shadow, "↑ Super" badge pops in</li>
+      <li><strong>5.05s</strong> — card settles back, tutorial ends</li>
+    </ol>
+    <div class="callout">
+      <div class="callout-label">Implementation note</div>
+      <p>CSS keyframe animations were ruled out because <code>.image-stage</code> already receives inline <code>style.transform</code> from swipe gesture logic, which overrides CSS animations on the same element. The tutorial instead uses <code>imageCardRef.current.style.transform</code> set imperatively in <code>setTimeout</code> callbacks — this bypasses the CSS cascade entirely and gives exact, conflict-free timing control. All timers are cleared in the <code>useEffect</code> cleanup to prevent state leaks when the user swipes before the animation finishes.</p>
+    </div>
+    <p>Badge overlays ("← Nope", "Like →", "↑ Super") are rendered conditionally via a <code>tutorialHint</code> React state and use a 0.25s pop-in CSS animation (<code>tutorial-badge-in</code>) for a polished reveal. They are positioned <code>absolute</code> inside <code>.image-card</code>, styled with color-matched semi-transparent backgrounds and <code>backdrop-filter: blur</code>.</p>
+
+    <h3 class="sub-title">Floating card animation — All eval images</h3>
+    <p>Every image in the eval screen now gently floats vertically via a CSS animation on <code>.image-wrap</code> (the outer container), creating a sense of life and visual interest between swipes.</p>
+    <ul>
+      <li>Keyframe: <code>card-float</code> — <code>translateY(0)</code> → <code>translateY(-8px)</code> → back, over 4.2s <code>ease-in-out infinite</code></li>
+      <li>Applied to <code>.image-wrap</code>, not <code>.image-card</code> — keeps it isolated from the tutorial's imperative transforms on <code>.image-card</code> and the swipe gesture transforms on <code>.image-stage</code></li>
+    </ul>
+
+    <h3 class="sub-title">Theme system</h3>
+    <p>Four visual themes are selectable from the home screen via a pill toggle. Each theme adjusts <code>--body-bg</code>, <code>--surface</code>, <code>--primary</code>, and other CSS custom properties globally.</p>
+    <div class="chip-row">
+      <span class="chip">Light — clean white</span>
+      <span class="chip">Dark — deep indigo gradient</span>
+      <span class="chip">Fun — purple accent (default)</span>
+      <span class="chip">Focus — minimal black/grey</span>
+    </div>
+
+    <h3 class="sub-title">Leaderboard on Done screen</h3>
+    <p>After a session completes, the Done screen now renders a ranked leaderboard pulled from the API alongside the per-session stats. Cards show rank medal, reviewer name, composite score %, and per-dimension breakdowns (Style, Prompt, Skin Tone %). The #1 card receives a distinct border and shadow treatment. Data is returned by the <code>/api/save-results</code> response.</p>
   </div>
 
   <!-- FOOTER -->

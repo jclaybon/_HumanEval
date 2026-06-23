@@ -217,10 +217,17 @@ export default function App() {
   const [swipePreview, setSwipePreview] = useState(null);
   const [stageStyle, setStageStyle] = useState(defaultStageStyle);
   const [reviewerName, setReviewerName] = useState("");
+  const [theme, setTheme] = useState(() => localStorage.getItem("humaneval-theme") || "fun");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("humaneval-theme", theme);
+  }, [theme]);
   const [doneView, setDoneView] = useState({
     doneCopy: "Results were saved.",
     savedPath: "-",
-    stats: emptyStats
+    stats: emptyStats,
+    leaderboard: []
   });
 
   const imageStageRef = useRef(null);
@@ -245,10 +252,6 @@ export default function App() {
   const currentTask = tasks[currentIndex] ?? null;
   const currentImage = currentTask?.image ?? null;
   const currentEvalCopy = getEvalCopy(currentTask?.evalType);
-  const swipeHint = reviewState.maskMode
-    ? "Circle failure points, add a note, then tap Next image"
-    : "Left no, right like, up super like";
-
   function setBatchInfoValue(nextValue) {
     batchInfoRef.current = nextValue;
     setBatchInfo(nextValue);
@@ -654,6 +657,13 @@ export default function App() {
         throw new Error(payload.error || "Could not save results.");
       }
 
+      let leaderboard = [];
+      try {
+        const lbRes = await fetch(`${apiBaseUrl}/api/leaderboard?batch=${batchInfoRef.current.batchName}`);
+        const lbPayload = await lbRes.json();
+        leaderboard = lbPayload.reviewers || [];
+      } catch (_) {}
+
       setDoneView({
         doneCopy: `Saved ${payload.reviewed_count} checks.`,
         savedPath: payload.output_path,
@@ -663,7 +673,8 @@ export default function App() {
           superLikes: payload.super_likes,
           notLikes: payload.not_likes,
           markedIssues: payload.marked_issues
-        }
+        },
+        leaderboard
       });
     } catch (error) {
       setDoneView({
@@ -851,6 +862,8 @@ export default function App() {
     return (
       <HomeScreen
         onStart={(name) => { setReviewerName(name); setScreen("eval"); }}
+        theme={theme}
+        onThemeChange={setTheme}
       />
     );
   }
@@ -861,6 +874,7 @@ export default function App() {
         doneCopy={doneView.doneCopy}
         savedPath={doneView.savedPath}
         stats={doneView.stats}
+        leaderboard={doneView.leaderboard}
       />
     );
   }
@@ -889,7 +903,6 @@ export default function App() {
       reviewState={reviewState}
       maskPathsCount={maskPaths.length}
       swipePreview={swipePreview}
-      swipeHint={swipeHint}
       stageStyle={stageStyle}
       imageStageRef={imageStageRef}
       imageRef={imageRef}
