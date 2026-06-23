@@ -1,6 +1,9 @@
+import { useState } from "react";
+
 export default function EvalScreen({
   title,
   image,
+  contextChip,
   currentIndex,
   total,
   imageReady,
@@ -31,6 +34,7 @@ export default function EvalScreen({
   onClearMarks,
   onSkip
 }) {
+  const [chipOpen, setChipOpen] = useState(false);
   const isMarking = reviewState.maskMode;
   const hasNotes = reviewState.notes.trim().length > 0;
   const hasMarks = maskPathsCount > 0;
@@ -105,6 +109,22 @@ export default function EvalScreen({
           </div>
         </div>
       </div>
+
+      {contextChip ? (
+        <div className="context-chip-wrap">
+          <button
+            className={`context-chip-btn ${chipOpen ? "open" : ""}`}
+            type="button"
+            onClick={() => setChipOpen((o) => !o)}
+          >
+            {contextChip.label}
+            <span className="context-chip-arrow">{chipOpen ? "▲" : "▼"}</span>
+          </button>
+          {chipOpen ? (
+            <p className="context-chip-text">{contextChip.text}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="swipe-panel">
         {!isMarking ? (

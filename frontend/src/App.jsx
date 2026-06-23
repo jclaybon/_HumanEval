@@ -216,6 +216,7 @@ export default function App() {
   const [imageError, setImageError] = useState(false);
   const [swipePreview, setSwipePreview] = useState(null);
   const [stageStyle, setStageStyle] = useState(defaultStageStyle);
+  const [reviewerName, setReviewerName] = useState("");
   const [doneView, setDoneView] = useState({
     doneCopy: "Results were saved.",
     savedPath: "-",
@@ -643,6 +644,7 @@ export default function App() {
         body: JSON.stringify({
           batch_name: batchInfoRef.current.batchName,
           image_dir: batchInfoRef.current.reviewSource,
+          reviewer_name: reviewerName,
           results: normalizedResults
         })
       });
@@ -848,7 +850,7 @@ export default function App() {
   if (screen === "home") {
     return (
       <HomeScreen
-        onStart={() => setScreen("eval")}
+        onStart={(name) => { setReviewerName(name); setScreen("eval"); }}
       />
     );
   }
@@ -863,10 +865,23 @@ export default function App() {
     );
   }
 
+  const contextChip = (() => {
+    if (!currentTask || !currentImage) return null;
+    if (currentTask.evalType === "prompt_faithfulness" && currentImage.created_from_prompt) {
+      return { label: "Prompt", text: currentImage.created_from_prompt };
+    }
+    if (currentTask.evalType === "style_faithfulness") {
+      const parts = [currentImage.style_name, currentImage.style_description_keyword].filter(Boolean);
+      if (parts.length) return { label: "Style", text: parts.join(" — ") };
+    }
+    return null;
+  })();
+
   return (
     <EvalScreen
       title={currentEvalCopy.title}
       image={currentImage}
+      contextChip={contextChip}
       currentIndex={currentIndex}
       total={tasks.length}
       imageReady={imageReady}
