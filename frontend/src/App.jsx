@@ -3,6 +3,7 @@ import DoneScreen from "./components/DoneScreen";
 import EmptyScreen from "./components/EmptyScreen";
 import EvalScreen from "./components/EvalScreen";
 import HomeScreen from "./components/HomeScreen";
+import LeaderboardScreen from "./components/LeaderboardScreen";
 import LoadingScreen from "./components/LoadingScreen";
 
 const initialReviewState = {
@@ -216,6 +217,7 @@ export default function App() {
   const [imageError, setImageError] = useState(false);
   const [swipePreview, setSwipePreview] = useState(null);
   const [stageStyle, setStageStyle] = useState(defaultStageStyle);
+  const [showSuperLike, setShowSuperLike] = useState(false);
   const [reviewerName, setReviewerName] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("humaneval-theme") || "fun");
 
@@ -223,6 +225,7 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("humaneval-theme", theme);
   }, [theme]);
+
   const [doneView, setDoneView] = useState({
     doneCopy: "Results were saved.",
     savedPath: "-",
@@ -252,6 +255,7 @@ export default function App() {
   const currentTask = tasks[currentIndex] ?? null;
   const currentImage = currentTask?.image ?? null;
   const currentEvalCopy = getEvalCopy(currentTask?.evalType);
+
   function setBatchInfoValue(nextValue) {
     batchInfoRef.current = nextValue;
     setBatchInfo(nextValue);
@@ -451,6 +455,7 @@ export default function App() {
       verdict: "not_like",
       maskMode: true
     });
+    navigator.vibrate?.(10);
     setSwipePreview(null);
     setStageStyle({
       transition: "transform .18s ease, opacity .18s ease",
@@ -546,23 +551,39 @@ export default function App() {
 
   function completeSwipeDecision(decision) {
     patchReviewState({ verdict: decision });
-    setSwipePreview(decision);
-    setStageStyle({
-      transition: "transform .24s ease, opacity .24s ease",
-      transform:
-        decision === "super_like"
-          ? "translate3d(0, -140px, 0) scale(.96)"
-          : decision === "like"
+
+    if (decision === "super_like") {
+      navigator.vibrate?.([15, 60, 15]);
+      setShowSuperLike(true);
+      setSwipePreview(decision);
+      setStageStyle({
+        transition: "transform .24s ease, opacity .24s ease",
+        transform: "translate3d(0, -140px, 0) scale(.96)",
+        opacity: 0.08
+      });
+      window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = window.setTimeout(() => {
+        advanceTimerRef.current = null;
+        advance(false);
+        window.setTimeout(() => setShowSuperLike(false), 680);
+      }, 220);
+    } else {
+      navigator.vibrate?.(10);
+      setSwipePreview(decision);
+      setStageStyle({
+        transition: "transform .24s ease, opacity .24s ease",
+        transform:
+          decision === "like"
             ? "translate3d(140px, -10px, 0) rotate(14deg)"
             : "translate3d(-140px, -10px, 0) rotate(-14deg)",
-      opacity: 0.08
-    });
-
-    window.clearTimeout(advanceTimerRef.current);
-    advanceTimerRef.current = window.setTimeout(() => {
-      advanceTimerRef.current = null;
-      advance(false);
-    }, 220);
+        opacity: 0.08
+      });
+      window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = window.setTimeout(() => {
+        advanceTimerRef.current = null;
+        advance(false);
+      }, 220);
+    }
   }
 
   function goToImage(nextIndex) {
@@ -862,8 +883,25 @@ export default function App() {
     return (
       <HomeScreen
         onStart={(name) => { setReviewerName(name); setScreen("eval"); }}
+        onViewLeaderboard={async () => {
+          try {
+            const res = await fetch(`${apiBaseUrl}/api/leaderboard?batch=underscorehumaneval`);
+            const payload = await res.json();
+            setDoneView((prev) => ({ ...prev, leaderboard: payload.reviewers || [] }));
+          } catch (_) {}
+          setScreen("leaderboard");
+        }}
         theme={theme}
         onThemeChange={setTheme}
+      />
+    );
+  }
+
+  if (screen === "leaderboard") {
+    return (
+      <LeaderboardScreen
+        leaderboard={doneView.leaderboard}
+        onBack={() => setScreen("home")}
       />
     );
   }
@@ -904,6 +942,7 @@ export default function App() {
       maskPathsCount={maskPaths.length}
       swipePreview={swipePreview}
       stageStyle={stageStyle}
+      showSuperLike={showSuperLike}
       imageStageRef={imageStageRef}
       imageRef={imageRef}
       maskCanvasRef={maskCanvasRef}

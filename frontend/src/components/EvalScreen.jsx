@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import sammySrc from "../assets/sammy-head-no-light.png";
+import sammy2Src from "../assets/SAMMY2.0_04-removebg-preview.png";
 
 export default function EvalScreen({
   title,
@@ -12,6 +14,7 @@ export default function EvalScreen({
   maskPathsCount,
   swipePreview,
   stageStyle,
+  showSuperLike,
   imageStageRef,
   imageRef,
   maskCanvasRef,
@@ -33,7 +36,7 @@ export default function EvalScreen({
   onClearMarks,
   onSkip
 }) {
-  const [chipOpen, setChipOpen] = useState(false);
+  const [chipOpen, setChipOpen] = useState(true);
   const [tutorialHint, setTutorialHint] = useState(null);
   const imageCardRef = useRef(null);
   const tutorialTimersRef = useRef([]);
@@ -124,25 +127,13 @@ export default function EvalScreen({
               onPointerCancel={onMaskPointerCancel}
             />
             <div className="swipe-overlay">
-              <div
-                className={`swipe-badge nope ${
-                  swipePreview === "not_like" ? "visible" : ""
-                }`}
-              >
+              <div className={`swipe-badge nope ${swipePreview === "not_like" ? "visible" : ""}`}>
                 Nope
               </div>
-              <div
-                className={`swipe-badge like ${
-                  swipePreview === "like" ? "visible" : ""
-                }`}
-              >
+              <div className={`swipe-badge like ${swipePreview === "like" ? "visible" : ""}`}>
                 Like
               </div>
-              <div
-                className={`swipe-badge super ${
-                  swipePreview === "super_like" ? "visible" : ""
-                }`}
-              >
+              <div className={`swipe-badge super ${swipePreview === "super_like" ? "visible" : ""}`}>
                 Super
               </div>
             </div>
@@ -238,6 +229,18 @@ export default function EvalScreen({
           Skip this image
         </button>
       </div>
+
+      {!isMarking && (
+        <div className="sammy-peek" aria-hidden="true">
+          <img src={sammySrc} alt="" />
+        </div>
+      )}
+
+      {showSuperLike && (
+        <div className="superlike-flash" aria-hidden="true">
+          <img src={sammy2Src} alt="" />
+        </div>
+      )}
     </div>
   );
 }

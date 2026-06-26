@@ -1,6 +1,6 @@
 import { useState } from "react";
 import logoSrc from "../assets/underscore-animation-logo.png";
-import sammySrc from "../assets/sammy-startup-removebg-preview.png";
+import sammySrc from "../assets/sammy-head-no-light.png";
 
 const THEMES = [
   { id: "light", label: "LIGHT", dot: "#9896a4" },
@@ -9,7 +9,7 @@ const THEMES = [
   { id: "focus", label: "FOCUS", dot: "#111111" },
 ];
 
-export default function HomeScreen({ onStart, theme, onThemeChange }) {
+export default function HomeScreen({ onStart, onViewLeaderboard, theme, onThemeChange }) {
   const [name, setName] = useState("");
   const trimmed = name.trim();
 
@@ -27,7 +27,17 @@ export default function HomeScreen({ onStart, theme, onThemeChange }) {
         </div>
         <div className="home-copy">
           <span className="home-kicker">Underscore Animation</span>
-          <h1>Human Eval</h1>
+          <h1 aria-label="Human Eval">
+            {"Human Eval".split("").map((char, i) => (
+              <span
+                key={i}
+                className="title-letter"
+                style={{ animationDelay: `${300 + i * 70}ms` }}
+              >
+                {char === " " ? " " : char}
+              </span>
+            ))}
+          </h1>
         </div>
       </div>
 
@@ -62,6 +72,14 @@ export default function HomeScreen({ onStart, theme, onThemeChange }) {
         onClick={() => onStart(trimmed)}
       >
         start
+      </button>
+
+      <button
+        className="home-leaderboard-btn"
+        type="button"
+        onClick={onViewLeaderboard}
+      >
+        View Leaderboard →
       </button>
 
       <div className="sammy-peek" aria-hidden="true">

@@ -878,8 +878,8 @@
       The product is nicknamed <em>Vibe Check</em> internally — reflecting its goal of fast, opinionated, gut-level human judgment on AI image quality at scale.
     </p>
     <div class="callout">
-      <div class="callout-label">Core insight</div>
-      <p>AI image generation produces large batches that need rapid, consistent human review across multiple quality axes. A Tinder-style swipe UX lets reviewers work through hundreds of images quickly without form-filling fatigue.</p>
+      <div class="callout-label">Where this fits</div>
+      <p>Human Eval is the <strong>10% human layer</strong> in Underscore Animation's LoRA training pipeline. AI generates at scale; automated metrics catch obvious failures; this tool is where human taste and judgment is injected before results feed back into the next training cycle.</p>
     </div>
   </div>
 
@@ -920,9 +920,9 @@
     <h3 class="sub-title">Non-Goals</h3>
     <ul>
       <li>Not a public-facing product — internal use only</li>
-      <li>Not a model training harness — evaluation data is an output, not a direct training pipeline</li>
-      <li>Not a real-time collaboration tool — one reviewer per batch session</li>
+      <li>Not a real-time collaboration tool — reviewers work independently per session</li>
       <li>Not a general-purpose image annotation platform</li>
+      <li>Not responsible for model training itself — it produces the signal, not the gradient</li>
     </ul>
   </div>
 
@@ -1356,48 +1356,109 @@ python3 vibe_check_server.py --open</pre>
     </table>
   </div>
 
-  <!-- 14. OPEN WORK -->
+  <!-- 14. PIPELINE CONTEXT -->
   <div class="section">
-    <div class="section-label">14 — Open Items</div>
-    <h2 class="section-title">Potential next steps</h2>
+    <div class="section-label">14 — Pipeline Context</div>
+    <h2 class="section-title">Where Human Eval fits in the LoRA pipeline</h2>
     <hr class="section-rule" />
-    <ul>
-      <li>Multi-reviewer support — allow multiple reviewers to rate the same batch and aggregate results</li>
-      <li>Reviewer identity tracking — associate eval records with a reviewer ID/name for inter-annotator agreement metrics</li>
-      <li>Progress persistence — save partial progress so a session can be resumed after closing the browser</li>
-      <li>Batch filtering — allow reviewers to filter by eval type, model, or style before starting a session</li>
-      <li>Export to CSV — produce a flat CSV alongside the JSON for easier spreadsheet analysis</li>
-      <li>Training signal pipeline — automated push of eval_logs to a model fine-tuning data store</li>
-      <li>Admin dashboard — view aggregate stats across batches and models</li>
-    </ul>
+    <p>Human Eval is one layer in a larger AI image generation and quality loop. The full pipeline runs as follows:</p>
+    <div class="flow" style="flex-direction:column; align-items:flex-start; gap:0.6rem;">
+      <div style="display:flex; align-items:center; gap:0;">
+        <div class="flow-step">LoRA Training (Colab / DGX Spark)</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0; padding-left:1rem;">
+        <div class="flow-arrow" style="padding:0 0 0 0.2rem;">↓</div>
+        <span style="font-size:0.78rem; color:var(--app-muted); margin-left:0.5rem;">Character pipeline · Background pipeline</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div class="flow-step">Image Generation (batch → R2)</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0; padding-left:1rem;">
+        <div class="flow-arrow" style="padding:0 0 0 0.2rem;">↓</div>
+        <span style="font-size:0.78rem; color:var(--app-muted); margin-left:0.5rem;">Automated prompt/style/skin tone checks</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div class="flow-step" style="background:rgba(124,58,237,0.08); border-color:rgba(124,58,237,0.25);">Human Eval — 10% human layer ← you are here</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0; padding-left:1rem;">
+        <div class="flow-arrow" style="padding:0 0 0 0.2rem;">↓</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div class="flow-step">Feedback loop → next LoRA training cycle</div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Two LoRA tracks</h3>
+    <div class="arch-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="arch-card">
+        <div class="arch-card-icon">🧍</div>
+        <div class="arch-card-title">Character LoRA</div>
+        <div class="arch-card-desc">Trains character consistency — face, proportions, costume, skin tone accuracy across generations. Evaluated on <code>prompt_faithfulness</code>, <code>monk_skin_tone</code>, and <code>overall_vibe_check</code>.</div>
+      </div>
+      <div class="arch-card">
+        <div class="arch-card-icon">🌆</div>
+        <div class="arch-card-title">Background LoRA</div>
+        <div class="arch-card-desc">Trains environment and scene consistency — colour palette, perspective, lighting, and aesthetic alignment. Evaluated primarily on <code>style_faithfulness</code> and <code>overall_vibe_check</code>.</div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">Base model</h3>
+    <p><strong>FLUX.1 Dev</strong> is the recommended base model for both pipelines. It has the strongest style adherence and LoRA compatibility of any current open-weight diffusion model, with well-documented training workflows for both Colab and DGX environments. SDXL is available as a fallback for higher-throughput batch generation at the cost of some quality.</p>
   </div>
 
-  <!-- 15. UX HIGHLIGHTS -->
+  <!-- 15. TRAINING FEEDBACK LOOP -->
   <div class="section">
-    <div class="section-label">15 — UX Highlights</div>
-    <h2 class="section-title">Opportunities to improve reviewer experience</h2>
+    <div class="section-label">15 — Training Feedback Loop</div>
+    <h2 class="section-title">Turning eval results into training signal</h2>
     <hr class="section-rule" />
+    <p>The D1 <code>eval_logs</code> table is the bridge between human review and model improvement. Each eval session adds rows with <code>reviewer_name</code>, <code>verdict</code>, and <code>eval_type</code> — all the signal needed to rank images for re-training.</p>
 
-    <h3 class="sub-title">Task Clarity</h3>
-    <p>The eval title (e.g. "Prompt faithful?") communicates what to judge but not what a positive or negative verdict means in context. Adding a one-liner below the title — e.g. <em>"Does the image match what was prompted?"</em> — would reduce reviewer ambiguity, especially for first-time users.</p>
+    <h3 class="sub-title">Consensus filtering</h3>
+    <p>Because multiple reviewers may rate the same image, results are aggregated by approval rate before selecting training images. A simple majority threshold filters out noise while maintaining enough volume for effective LoRA training.</p>
+    <pre>SELECT
+  image_id,
+  MIN(r2_key) AS r2_key,
+  COUNT(*) AS total_votes,
+  ROUND(
+    SUM(CASE WHEN verdict IN ('like','super_like') THEN 1 ELSE 0 END)
+    * 100.0 / COUNT(*), 0
+  ) AS approval_pct
+FROM eval_logs el
+JOIN image_metadata im ON el.image_id = im.id
+WHERE eval_type = 'overall_vibe_check'
+  AND verdict != 'skip'
+GROUP BY image_id
+HAVING approval_pct >= 70
+ORDER BY approval_pct DESC</pre>
 
-    <h3 class="sub-title">Progress Feedback</h3>
-    <p>The current <code>3 / 30</code> pill gives a count but limited momentum. A thin progress bar across the top of the eval screen would give a stronger visceral sense of completion and help reviewers pace themselves across longer sessions.</p>
+    <div class="callout">
+      <div class="callout-label">Threshold guidance</div>
+      <p><strong>≥ 70% approval</strong> — permissive, larger training set. <strong>100% unanimous</strong> — smallest but cleanest. Start at 70% and adjust based on volume; LoRA training generally needs 50–100+ images per concept to generalise well.</p>
+    </div>
 
-    <h3 class="sub-title">Not-Like Flow Friction</h3>
-    <p>A left swipe currently requires both a canvas annotation and a written note before the reviewer can advance. This is intentionally high-signal but high-friction. A lighter path — e.g. "flag without marking" — could improve completion rates while still capturing the negative verdict.</p>
+    <h3 class="sub-title">What each verdict contributes</h3>
+    <table>
+      <thead><tr><th>Verdict</th><th>Training use</th></tr></thead>
+      <tbody>
+        <tr><td><code>super_like</code> / <code>like</code></td><td>Positive training examples — pull from R2 and include in next LoRA dataset</td></tr>
+        <tr><td><code>not_like</code> with marks</td><td>Negative signal — exclude from training; the <code>mask_data_url</code> PNG encodes exactly where the failure is, usable for targeted inpainting or failure mode clustering</td></tr>
+        <tr><td><code>not_like</code> notes</td><td>Free-text failure descriptions — cluster to identify systemic issues (wrong palette, wrong proportions, etc.) to feed back into prompt engineering</td></tr>
+        <tr><td><code>skip</code></td><td>Exclude — reviewer was uncertain; don't use as training signal either way</td></tr>
+      </tbody>
+    </table>
 
-    <h3 class="sub-title">Task Grouping</h3>
-    <p>Tasks are currently shuffled randomly across all images and eval types. Grouping by image — evaluating all aspects of one image before moving to the next — may feel more natural since the reviewer is already in context. Worth A/B testing against the shuffled approach.</p>
-
-    <h3 class="sub-title">Swipe Legend</h3>
-    <p>The legend (← No · ↑ Super like · → Like) sits below the image in text form. Replacing the text arrows with small colored directional indicators would make the legend faster to scan at a glance.</p>
-
-    <h3 class="sub-title">Session Recovery</h3>
-    <p>If a reviewer closes the tab mid-session, all progress is lost and they restart from the beginning. Persisting partial results to <code>localStorage</code> keyed by reviewer name + batch would allow seamless resumption without requiring a server round-trip.</p>
-
-    <h3 class="sub-title">Done Screen Dead End</h3>
-    <p>The done screen currently has no path to start a new session or re-review. Adding a restart button (same reviewer, new shuffle) or a switch-reviewer option would improve usability in multi-person eval sessions.</p>
+    <h3 class="sub-title">Multi-pass images</h3>
+    <p>Images that pass across <em>all</em> eval types from multiple reviewers are the highest-confidence training candidates:</p>
+    <pre>SELECT image_id, MIN(r2_key) AS r2_key
+FROM (
+  SELECT el.image_id, im.r2_key, el.eval_type
+  FROM eval_logs el
+  JOIN image_metadata im ON el.image_id = im.id
+  WHERE verdict IN ('like', 'super_like')
+    AND batch_name = 'underscorehumaneval'
+)
+GROUP BY image_id
+HAVING COUNT(DISTINCT eval_type) >= 3</pre>
   </div>
 
   <!-- 16. SHIPPED — JUNE 2026 -->
@@ -1407,47 +1468,26 @@ python3 vibe_check_server.py --open</pre>
     <hr class="section-rule" />
     <p>These features were designed, built, and deployed to production (<code>underscore-humaneval-worker.humaneval.workers.dev</code>) in the June 2026 sprint.</p>
 
-    <h3 class="sub-title">Sammy Startup mascot peek — Home Screen</h3>
-    <p>
-      <strong>Sammy Startup</strong> is the flagship character from Underscore Animation's show of the same name. A transparent PNG cutout of Sammy's head and lightbulb (<code>sammy-startup-removebg-preview.png</code>) is now fixed to the bottom of the home screen, peeking up as if emerging from below the fold.
-    </p>
-    <ul>
-      <li>Asset: transparent PNG produced via remove.bg from the original JPG, cropped to head + lightbulb only</li>
-      <li>Positioned <code>fixed</code> at the horizontal center, anchored <code>bottom: -20px</code> so the character appears to peek in</li>
-      <li>Sized responsively: <code>min(300px, 75vw)</code> — large enough to read on mobile without crowding the UI</li>
-      <li>Animated with a continuous 3.8s <code>sammy-float</code> keyframe — gently bobs ±10px on the Y axis, <code>ease-in-out infinite</code></li>
-      <li><code>pointer-events: none</code> and <code>aria-hidden="true"</code> — purely decorative, doesn't block interaction</li>
-    </ul>
+    <h3 class="sub-title">Sammy character peek</h3>
+    <p>Sammy (<code>sammys-head-removebg-preview.png</code>) is fixed to the bottom of the home screen and the eval swipe screen, peeking up from below the fold. Sammy is hidden during mark mode (when a reviewer is annotating a failure) and absent entirely from the done/stats screen. A continuous 3.8s <code>sammy-float</code> keyframe bobs the character ±10px on the Y axis.</p>
+
+    <h3 class="sub-title">SAMMY 2.0 super like moment</h3>
+    <p>On a super like verdict, a full-screen overlay fires showing <code>SAMMY2.0_04-removebg-preview.png</code> — a full-body character asset — with a jump-out animation: Sammy slides up from the bottom of the screen, bounces, and holds for ~900ms before the next image loads underneath. Implemented as a fixed <code>z-index: 200</code> overlay with <code>superlike-jump</code> and <code>superlike-bg</code> keyframes. The card still executes its standard fly-up exit animation beneath the overlay.</p>
 
     <h3 class="sub-title">Swipe gesture tutorial — First eval image</h3>
-    <p>
-      When a reviewer lands on the first image of any session (<code>currentIndex === 0 &amp;&amp; imageReady</code>), an automatic animation plays to demonstrate the three swipe gestures — no text instructions needed.
-    </p>
-    <p>The sequence (JS-driven via <code>useEffect</code> + <code>setTimeout</code>, imperative DOM manipulation on <code>imageCardRef</code>):</p>
-    <ol>
-      <li><strong>0.8s</strong> — card pulses with a subtle purple scale + glow (attention grab)</li>
-      <li><strong>1.7s</strong> — card slides left 72px, rotates −9°, red box-shadow, "← Nope" badge pops in</li>
-      <li><strong>2.45s</strong> — card snaps back, badge disappears</li>
-      <li><strong>3.0s</strong> — card slides right 72px, rotates +9°, green box-shadow, "Like →" badge pops in</li>
-      <li><strong>3.75s</strong> — card snaps back, badge disappears</li>
-      <li><strong>4.3s</strong> — card floats up 75px, amber box-shadow, "↑ Super" badge pops in</li>
-      <li><strong>5.05s</strong> — card settles back, tutorial ends</li>
-    </ol>
-    <div class="callout">
-      <div class="callout-label">Implementation note</div>
-      <p>CSS keyframe animations were ruled out because <code>.image-stage</code> already receives inline <code>style.transform</code> from swipe gesture logic, which overrides CSS animations on the same element. The tutorial instead uses <code>imageCardRef.current.style.transform</code> set imperatively in <code>setTimeout</code> callbacks — this bypasses the CSS cascade entirely and gives exact, conflict-free timing control. All timers are cleared in the <code>useEffect</code> cleanup to prevent state leaks when the user swipes before the animation finishes.</p>
-    </div>
-    <p>Badge overlays ("← Nope", "Like →", "↑ Super") are rendered conditionally via a <code>tutorialHint</code> React state and use a 0.25s pop-in CSS animation (<code>tutorial-badge-in</code>) for a polished reveal. They are positioned <code>absolute</code> inside <code>.image-card</code>, styled with color-matched semi-transparent backgrounds and <code>backdrop-filter: blur</code>.</p>
+    <p>When a reviewer lands on the first image (<code>currentIndex === 0 &amp;&amp; imageReady</code>), an automatic animation demonstrates all three swipe directions using imperative DOM manipulation on <code>imageCardRef</code>. Badge overlays ("← Nope", "Like →", "↑ Super") render conditionally via <code>tutorialHint</code> state with a pop-in CSS animation. All timers are cleaned up if the user swipes before the sequence completes.</p>
 
-    <h3 class="sub-title">Floating card animation — All eval images</h3>
-    <p>Every image in the eval screen now gently floats vertically via a CSS animation on <code>.image-wrap</code> (the outer container), creating a sense of life and visual interest between swipes.</p>
-    <ul>
-      <li>Keyframe: <code>card-float</code> — <code>translateY(0)</code> → <code>translateY(-8px)</code> → back, over 4.2s <code>ease-in-out infinite</code></li>
-      <li>Applied to <code>.image-wrap</code>, not <code>.image-card</code> — keeps it isolated from the tutorial's imperative transforms on <code>.image-card</code> and the swipe gesture transforms on <code>.image-stage</code></li>
-    </ul>
+    <h3 class="sub-title">Floating card + swipe animations</h3>
+    <p>The image card gently floats vertically (<code>card-float</code> keyframe, 4.2s infinite on <code>.image-wrap</code>). During swipe, the card follows the pointer with rotation and opacity feedback. On verdict, the card exits with a directional fly animation before the next image loads.</p>
+
+    <h3 class="sub-title">Context chips — open by default</h3>
+    <p>Prompt and style context chips now start expanded (<code>useState(true)</code>) so reviewers immediately see the relevant prompt or style description without having to tap to open it. Chips can still be collapsed to reclaim screen space.</p>
+
+    <h3 class="sub-title">Title letter animation — Home screen</h3>
+    <p>"Human Eval" renders as individually-wrapped <code>&lt;span class="title-letter"&gt;</code> elements, each animated with a staggered <code>letter-pop</code> keyframe (70ms delay per letter, starting 300ms after load). Each letter scales up ~1.45×, slightly overshoots, and snaps back — creating a left-to-right wave on first load.</p>
 
     <h3 class="sub-title">Theme system</h3>
-    <p>Four visual themes are selectable from the home screen via a pill toggle. Each theme adjusts <code>--body-bg</code>, <code>--surface</code>, <code>--primary</code>, and other CSS custom properties globally.</p>
+    <p>Four visual themes selectable from the home screen via a pill toggle, persisted to <code>localStorage</code>.</p>
     <div class="chip-row">
       <span class="chip">Light — clean white</span>
       <span class="chip">Dark — deep indigo gradient</span>
@@ -1455,8 +1495,11 @@ python3 vibe_check_server.py --open</pre>
       <span class="chip">Focus — minimal black/grey</span>
     </div>
 
-    <h3 class="sub-title">Leaderboard on Done screen</h3>
-    <p>After a session completes, the Done screen now renders a ranked leaderboard pulled from the API alongside the per-session stats. Cards show rank medal, reviewer name, composite score %, and per-dimension breakdowns (Style, Prompt, Skin Tone %). The #1 card receives a distinct border and shadow treatment. Data is returned by the <code>/api/save-results</code> response.</p>
+    <h3 class="sub-title">Reviewer name + leaderboard</h3>
+    <p>Reviewers enter their name on the home screen before starting. The name is saved with every <code>eval_logs</code> row (<code>reviewer_name</code> column). On session completion, the done screen renders a ranked leaderboard from <code>/api/leaderboard</code>, showing composite approval score and per-dimension breakdowns (Style, Prompt, Skin Tone) for all reviewers who have evaluated the current batch.</p>
+
+    <h3 class="sub-title">Infrastructure</h3>
+    <p>Fully deployed to Cloudflare Workers + R2 + D1. As of June 2026, 195+ eval log rows across multiple reviewer sessions. Free tier headroom: D1 at ~0% of 5 GB, R2 images well within 10 GB limit, Workers under 100K requests/day threshold.</p>
   </div>
 
   <!-- FOOTER -->
