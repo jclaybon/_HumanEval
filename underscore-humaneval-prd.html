@@ -1474,6 +1474,15 @@ HAVING COUNT(DISTINCT eval_type) >= 3</pre>
     <h3 class="sub-title">SAMMY 2.0 super like moment</h3>
     <p>On a super like verdict, a full-screen overlay fires showing <code>SAMMY2.0_04-removebg-preview.png</code> — a full-body character asset — with a jump-out animation: Sammy slides up from the bottom of the screen, bounces, and holds for ~900ms before the next image loads underneath. Implemented as a fixed <code>z-index: 200</code> overlay with <code>superlike-jump</code> and <code>superlike-bg</code> keyframes. The card still executes its standard fly-up exit animation beneath the overlay.</p>
 
+    <div style="display:flex; justify-content:center; margin: 1.2rem 0 0.4rem;">
+      <img
+        src="../frontend/src/assets/SAMMY2.0_04-removebg-preview.png"
+        alt="SAMMY 2.0 — super like jump animation asset"
+        style="width: min(220px, 60%); border-radius: 16px;"
+      />
+    </div>
+    <p style="text-align:center; font-size:0.74rem; color:var(--app-muted); margin-bottom:0.5rem;"><code>SAMMY2.0_04-removebg-preview.png</code> — the asset used in the super like overlay</p>
+
     <h3 class="sub-title">Swipe gesture tutorial — First eval image</h3>
     <p>When a reviewer lands on the first image (<code>currentIndex === 0 &amp;&amp; imageReady</code>), an automatic animation demonstrates all three swipe directions using imperative DOM manipulation on <code>imageCardRef</code>. Badge overlays ("← Nope", "Like →", "↑ Super") render conditionally via <code>tutorialHint</code> state with a pop-in CSS animation. All timers are cleaned up if the user swipes before the sequence completes.</p>
 
