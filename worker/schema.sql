@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS image_metadata (
   has_person INTEGER DEFAULT 0 CHECK(has_person IN (0, 1)),
   style_name TEXT,
   style_description_keyword TEXT,
+  style_reference_r2_key TEXT,  -- R2 key of the original training dataset image used as style reference
   r2_key TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );

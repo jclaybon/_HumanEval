@@ -14,3 +14,12 @@ if (!existsSync(sourcePath)) {
 
 mkdirSync(dirname(targetPath), { recursive: true });
 cpSync(sourcePath, targetPath);
+
+// Copy PRD assets so they resolve from /prd/
+const assetsToCopy = ["SAMMY2.0_04-removebg-preview.png"];
+for (const asset of assetsToCopy) {
+  const src = resolve(frontendDir, "src", "assets", asset);
+  if (existsSync(src)) {
+    cpSync(src, resolve(frontendDir, "dist", "prd", asset));
+  }
+}

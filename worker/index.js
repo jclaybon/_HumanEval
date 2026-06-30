@@ -109,7 +109,8 @@ export default {
           env.humaneval_db
             .prepare(`
               SELECT id, name, r2_key, COALESCE(has_person, 0) AS has_person,
-                     created_from_prompt, style_name, style_description_keyword
+                     created_from_prompt, style_name, style_description_keyword,
+                     style_reference_r2_key
               FROM image_metadata
             `)
             .all()
@@ -131,6 +132,8 @@ export default {
               metadataByKey.get(key) ||
               metadataByName.get(name);
 
+            // Fall back to the generated image's own key until real reference images are in R2
+            const styleRefKey = metadata?.style_reference_r2_key ?? key;
             return {
               id,
               name,
@@ -139,6 +142,7 @@ export default {
               created_from_prompt: metadata?.created_from_prompt ?? null,
               style_name: metadata?.style_name ?? null,
               style_description_keyword: metadata?.style_description_keyword ?? null,
+              style_reference_url: new URL(`/images/${encodeURIComponent(styleRefKey)}`, request.url).toString(),
             };
           }),
         });

@@ -18,15 +18,12 @@ export default function HomeScreen({ onStart, onViewLeaderboard, theme, onThemeC
       <div className="home-hero">
         <div className="home-orb home-orb-left" aria-hidden="true" />
         <div className="home-orb home-orb-right" aria-hidden="true" />
-        <div className="home-logo-card">
-          <img
-            className="home-logo"
-            src={logoSrc}
-            alt="Underscore Animation"
-          />
-        </div>
+
+        <img className="home-logo" src={logoSrc} alt="Underscore Animation" />
+
+        <div className="home-hero-rule" aria-hidden="true" />
+
         <div className="home-copy">
-          <span className="home-kicker">Underscore Animation</span>
           <h1 aria-label="Human Eval">
             {"Human Eval".split("").map((char, i) => (
               <span
@@ -38,6 +35,7 @@ export default function HomeScreen({ onStart, onViewLeaderboard, theme, onThemeC
               </span>
             ))}
           </h1>
+          <p className="home-tagline">AI image evaluation</p>
         </div>
       </div>
 

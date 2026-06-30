@@ -929,11 +929,18 @@ export default function App() {
     return null;
   })();
 
+  // style_reference_url will come from image_metadata once added to the DB schema
+  const styleReferenceUrl = currentTask?.evalType === "style_faithfulness"
+    ? (currentImage?.style_reference_url ?? null)
+    : null;
+
   return (
     <EvalScreen
       title={currentEvalCopy.title}
       image={currentImage}
       contextChip={contextChip}
+      styleReferenceUrl={styleReferenceUrl}
+      isStyleEval={currentTask?.evalType === "style_faithfulness"}
       currentIndex={currentIndex}
       total={tasks.length}
       imageReady={imageReady}

@@ -1252,12 +1252,35 @@
     <pre>model_metadata      — Fine-tuned model registry (model_id, name, training steps)
 
 image_metadata      — Per-image records (prompt, model, has_person flag, style,
-                      R2 object key)
+                      R2 object key, style_reference_r2_key)
 
 eval_logs           — One row per evaluation task result; foreign-keyed to
                       image_metadata; stores verdict, failure_points,
                       mask_binary, masked_areas, mask_data_url, notes,
                       batch_name, reviewed_at</pre>
+
+    <h3 class="sub-title">image_metadata — full column listing</h3>
+    <table>
+      <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>TEXT PK</td><td>Unique image identifier</td></tr>
+        <tr><td><code>name</code></td><td>TEXT</td><td>Filename / display name</td></tr>
+        <tr><td><code>description</code></td><td>TEXT</td><td>Optional free-text description</td></tr>
+        <tr><td><code>created_from_prompt</code></td><td>TEXT</td><td>The prompt used to generate the image — shown to reviewers during <code>prompt_faithfulness</code> eval</td></tr>
+        <tr><td><code>model_id</code></td><td>TEXT → model_metadata</td><td>Which fine-tuned model generated this image</td></tr>
+        <tr><td><code>has_person</code></td><td>INTEGER 0/1</td><td>Whether the image contains a character — gates <code>monk_skin_tone</code> eval</td></tr>
+        <tr><td><code>style_name</code></td><td>TEXT</td><td>Human-readable style label (e.g. "2D Animation")</td></tr>
+        <tr><td><code>style_description_keyword</code></td><td>TEXT</td><td>Keyword summary of the style shown in the context chip</td></tr>
+        <tr><td><code>style_reference_r2_key</code></td><td>TEXT</td><td>R2 key of the original training dataset image used as the visual style reference during <code>style_faithfulness</code> eval. The worker converts this to a <code>/images/…</code> URL at bootstrap time and serves it as <code>style_reference_url</code> in the API response.</td></tr>
+        <tr><td><code>r2_key</code></td><td>TEXT NOT NULL</td><td>R2 key of the generated image being evaluated</td></tr>
+        <tr><td><code>created_at</code></td><td>TEXT</td><td>ISO 8601 timestamp</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <div class="callout-label">Populating style references</div>
+      <p>Upload the reference image to R2, then run: <code>UPDATE image_metadata SET style_reference_r2_key = 'your-key.png' WHERE style_name = 'Your Style';</code> — the app will immediately show it in the style eval reference panel.</p>
+    </div>
 
     <p>Locally, results are written as a flat JSON file at <code>data/outputs/vibe_check_results.json</code>:</p>
     <pre>{
@@ -1476,7 +1499,7 @@ HAVING COUNT(DISTINCT eval_type) >= 3</pre>
 
     <div style="display:flex; justify-content:center; margin: 1.2rem 0 0.4rem;">
       <img
-        src="../frontend/src/assets/SAMMY2.0_04-removebg-preview.png"
+        src="./SAMMY2.0_04-removebg-preview.png"
         alt="SAMMY 2.0 — super like jump animation asset"
         style="width: min(220px, 60%); border-radius: 16px;"
       />
@@ -1506,6 +1529,9 @@ HAVING COUNT(DISTINCT eval_type) >= 3</pre>
 
     <h3 class="sub-title">Reviewer name + leaderboard</h3>
     <p>Reviewers enter their name on the home screen before starting. The name is saved with every <code>eval_logs</code> row (<code>reviewer_name</code> column). On session completion, the done screen renders a ranked leaderboard from <code>/api/leaderboard</code>, showing composite approval score and per-dimension breakdowns (Style, Prompt, Skin Tone) for all reviewers who have evaluated the current batch.</p>
+
+    <h3 class="sub-title">Style reference panel</h3>
+    <p>During <code>style_faithfulness</code> evaluations, a reference image from the original training dataset is shown below the main eval image. The <code>image_metadata</code> table has a new <code>style_reference_r2_key</code> column; the worker converts it to a signed <code>/images/…</code> URL at bootstrap time and passes it down as <code>style_reference_url</code>. When no reference is set, the panel shows a placeholder. Reviewers can immediately compare the AI-generated image against the source style — no context switching needed.</p>
 
     <h3 class="sub-title">Infrastructure</h3>
     <p>Fully deployed to Cloudflare Workers + R2 + D1. As of June 2026, 195+ eval log rows across multiple reviewer sessions. Free tier headroom: D1 at ~0% of 5 GB, R2 images well within 10 GB limit, Workers under 100K requests/day threshold.</p>
